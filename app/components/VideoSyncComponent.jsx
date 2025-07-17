@@ -85,8 +85,9 @@ export default function VideoSyncComponent({ boxId }) {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!boxInfo?.id || !token) return;
+    
+const socket = new SockJS(`${window.location.origin}/ws`);
 
-    const socket = new SockJS(`${baseUrl.replace(/^https/, "http")}/ws`)
     const client = new Client({
       webSocketFactory: () => socket,
       onConnect: () => {
