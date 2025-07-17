@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import SockJS from "sockjs-client";
+
 import { Client } from "@stomp/stompjs";
 import ReactPlayer from "react-player";
 import MembersSidebar from "../components/MembersSidebar";
@@ -77,96 +77,89 @@ export default function VideoSyncComponent({ boxId }) {
   }, [baseUrl, boxId]);
 
   // 🔌 WebSocket - Version alternative sans SockJS
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!boxInfo?.id || !token) return;
+useEffect(() => {
+  const token = localStorage.getItem("token");
+  if (!boxInfo?.id || !token) return;
 
-    // Fonction pour construire l'URL WebSocket correcte
-  const wsUrl = `https://cinemamongo-production.up.railway.app/ws`; // Exemple: https://cinema-backend-production.up.railway.app/ws
+  // ✅ WebSocket URL sécurisée (sans SockJS)
+  const wsUrl = "wss://cinemamongo-production.up.railway.app/websocket";
 
+  const client = new Client({
+    brokerURL: wsUrl, // ✅ WebSocket natif
+    connectHeaders: {
+      Authorization: "Bearer " + token,
+    },
+    reconnectDelay: 5000,
+    heartbeatIncoming: 4000,
+    heartbeatOutgoing: 4000,
+    debug: function (str) {
+      console.log("[STOMP DEBUG]:", str);
+    },
+    onConnect: () => {
+      console.log("✅ WebSocket connecté via brokerURL");
+      setConnected(true);
+      setError(null);
 
-    
+      client.subscribe(`/topic/box/${boxInfo.id}/video-sync`, (message) => {
+        const data = JSON.parse(message.body);
+        if (!playerRef.current) return;
 
-    // Configuration du client STOMP
-    const client = new Client({
-      // Option A: Utiliser SockJS
-      webSocketFactory: () => new SockJS(wsUrl),
-      
-      // Option B: Alternative avec WebSocket natif (décommentez si SockJS ne fonctionne pas)
-      // brokerURL: wsUrl.replace('/ws', '/websocket'),
-      
-      connectHeaders: { Authorization: "Bearer " + token },
-      
-      // Paramètres de reconnexion
-      reconnectDelay: 5000,
-      heartbeatIncoming: 4000,
-      heartbeatOutgoing: 4000,
-      
-      onConnect: () => {
-        console.log('✅ WebSocket connecté');
-        setConnected(true);
-        setError(null); // Réinitialiser l'erreur
-
-        client.subscribe(`/topic/box/${boxInfo.id}/video-sync`, (message) => {
-          const data = JSON.parse(message.body);
-          if (!playerRef.current) return;
-
-          switch (data.action) {
-            case "play":
-              playerRef.current.seekTo(data.time);
-              setPlaying(true);
-              break;
-            case "pause":
-              playerRef.current.seekTo(data.time);
-              setPlaying(false);
-              break;
-            case "seek":
-              lastSeekTime.current = data.time;
-              playerRef.current.seekTo(data.time);
-              break;
-          }
-        });
-
-        client.subscribe(`/topic/box/${boxInfo.id}/chat`, (message) => {
-          const data = JSON.parse(message.body);
-          setMessages((prev) => [...prev, data]);
-        });
-      },
-      
-      onDisconnect: () => {
-        console.log('❌ WebSocket déconnecté');
-        setConnected(false);
-      },
-      
-      onWebSocketError: (error) => {
-        console.error('❌ Erreur WebSocket:', error);
-        setError(`Erreur de connexion WebSocket. Vérifiez que votre serveur supporte WSS sur ${wsUrl}`);
-      },
-      
-      onStompError: (frame) => {
-        console.error('❌ Erreur STOMP:', frame.headers.message);
-        setError('Erreur de connexion STOMP: ' + frame.headers.message);
-      },
-    });
-
-    try {
-      client.activate();
-      stompClient.current = client;
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'activation:', error);
-      setError('Impossible d\'établir la connexion WebSocket');
-    }
-
-    return () => {
-      try {
-        if (client && client.connected) {
-          client.deactivate();
+        switch (data.action) {
+          case "play":
+            playerRef.current.seekTo(data.time);
+            setPlaying(true);
+            break;
+          case "pause":
+            playerRef.current.seekTo(data.time);
+            setPlaying(false);
+            break;
+          case "seek":
+            lastSeekTime.current = data.time;
+            playerRef.current.seekTo(data.time);
+            break;
         }
-      } catch (error) {
-        console.error('Erreur lors de la déconnexion:', error);
+      });
+
+      client.subscribe(`/topic/box/${boxInfo.id}/chat`, (message) => {
+        const data = JSON.parse(message.body);
+        setMessages((prev) => [...prev, data]);
+      });
+    },
+    onDisconnect: () => {
+      console.log("❌ WebSocket déconnecté");
+      setConnected(false);
+    },
+    onWebSocketError: (error) => {
+      console.error("❌ Erreur WebSocket:", error);
+      setError(
+        `Erreur WebSocket. Vérifie que ton backend supporte bien WSS sur ${wsUrl}`
+      );
+    },
+    onStompError: (frame) => {
+      console.error("❌ Erreur STOMP:", frame.headers.message);
+      setError("Erreur STOMP : " + frame.headers.message);
+    },
+  });
+
+  try {
+    client.activate();
+    stompClient.current = client;
+  } catch (error) {
+    console.error("❌ Erreur d'activation STOMP:", error);
+    setError("Impossible d'établir la connexion WebSocket");
+  }
+
+  return () => {
+    try {
+      if (client && client.connected) {
+        client.deactivate();
       }
-    };
-  }, [boxInfo, baseUrl]);
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion:", error);
+    }
+  };
+}, [boxInfo, baseUrl]);
+
 
   const sendAction = (action) => {
     if (
