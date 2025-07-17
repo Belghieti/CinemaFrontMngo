@@ -82,24 +82,8 @@ export default function VideoSyncComponent({ boxId }) {
     if (!boxInfo?.id || !token) return;
 
     // Fonction pour construire l'URL WebSocket correcte
-    const getWebSocketUrl = () => {
-      const isSecure = window.location.protocol === 'https:';
-      const wsProtocol = isSecure ? 'wss:' : 'ws:';
-      
-      // Nettoyer l'URL de base
-      let wsHost = baseUrl.replace(/^https?:\/\//, '');
-      
-      // Construire l'URL WebSocket
-      const wsUrl = `${wsProtocol}//${wsHost}/ws`;
-      
-      console.log('🔌 Base URL:', baseUrl);
-      console.log('🔌 WebSocket URL construite:', wsUrl);
-      console.log('🔌 Page protocol:', window.location.protocol);
-      
-      return wsUrl;
-    };
+  const wsUrl = `${baseUrl}/ws`; // Exemple: https://cinema-backend-production.up.railway.app/ws
 
-    const wsUrl = getWebSocketUrl();
 
     // Option 1: Utiliser WebSocket natif si SockJS pose problème
     if (window.location.protocol === 'https:' && !wsUrl.startsWith('wss:')) {
