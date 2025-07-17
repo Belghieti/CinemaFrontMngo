@@ -85,9 +85,17 @@ export default function VideoSyncComponent({ boxId }) {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!boxInfo?.id || !token) return;
-    
 
-const socket = new SockJS("https://${baseUrl}/ws");
+    // Construire l'URL du WebSocket en fonction du protocole (http / https)
+    const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+
+    // Extraire l'hôte sans protocole du baseUrl (ex: cinemamongo-production.up.railway.app)
+    const wsHost = baseUrl.replace(/^https?:\/\//, "");
+
+    // URL complète du socket
+    const wsUrl = `${wsProtocol}://${wsHost}/ws`;
+
+    const socket = new SockJS(wsUrl);
 
     const client = new Client({
       webSocketFactory: () => socket,
