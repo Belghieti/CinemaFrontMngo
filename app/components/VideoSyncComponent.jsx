@@ -76,37 +76,56 @@ export default function VideoSyncComponent({ boxId }) {
       });
   }, [baseUrl, boxId]);
 
-  // 🔌 WebSocket
+  // 🔌 WebSocket - Version alternative sans SockJS
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!boxInfo?.id || !token) return;
 
     // Fonction pour construire l'URL WebSocket correcte
     const getWebSocketUrl = () => {
-      try {
-        const url = new URL(baseUrl);
-        const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-        return `${protocol}//${url.host}/ws`;
-      } catch (error) {
-        console.error('Erreur lors de la construction de l\'URL WebSocket:', error);
-        // Fallback: détecter automatiquement le protocole
-        const isSecure = window.location.protocol === 'https:';
-        const wsProtocol = isSecure ? 'wss:' : 'ws:';
-        const wsHost = baseUrl.replace(/^https?:\/\//, '');
-        return `${wsProtocol}//${wsHost}/ws`;
-      }
+      const isSecure = window.location.protocol === 'https:';
+      const wsProtocol = isSecure ? 'wss:' : 'ws:';
+      
+      // Nettoyer l'URL de base
+      let wsHost = baseUrl.replace(/^https?:\/\//, '');
+      
+      // Construire l'URL WebSocket
+      const wsUrl = `${wsProtocol}//${wsHost}/ws`;
+      
+      console.log('🔌 Base URL:', baseUrl);
+      console.log('🔌 WebSocket URL construite:', wsUrl);
+      console.log('🔌 Page protocol:', window.location.protocol);
+      
+      return wsUrl;
     };
 
     const wsUrl = getWebSocketUrl();
-    console.log('🔌 Connexion WebSocket à:', wsUrl);
 
-    const socket = new SockJS(wsUrl);
+    // Option 1: Utiliser WebSocket natif si SockJS pose problème
+    if (window.location.protocol === 'https:' && !wsUrl.startsWith('wss:')) {
+      setError('Configuration WebSocket incorrecte pour HTTPS');
+      return;
+    }
+
+    // Configuration du client STOMP
     const client = new Client({
-      webSocketFactory: () => socket,
+      // Option A: Utiliser SockJS
+      webSocketFactory: () => new SockJS(wsUrl),
+      
+      // Option B: Alternative avec WebSocket natif (décommentez si SockJS ne fonctionne pas)
+      // brokerURL: wsUrl.replace('/ws', '/websocket'),
+      
       connectHeaders: { Authorization: "Bearer " + token },
+      
+      // Paramètres de reconnexion
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+      
       onConnect: () => {
         console.log('✅ WebSocket connecté');
         setConnected(true);
+        setError(null); // Réinitialiser l'erreur
 
         client.subscribe(`/topic/box/${boxInfo.id}/video-sync`, (message) => {
           const data = JSON.parse(message.body);
@@ -133,26 +152,38 @@ export default function VideoSyncComponent({ boxId }) {
           setMessages((prev) => [...prev, data]);
         });
       },
+      
       onDisconnect: () => {
         console.log('❌ WebSocket déconnecté');
         setConnected(false);
       },
+      
       onWebSocketError: (error) => {
         console.error('❌ Erreur WebSocket:', error);
-        setError('Erreur de connexion WebSocket');
+        setError(`Erreur de connexion WebSocket. Vérifiez que votre serveur supporte WSS sur ${wsUrl}`);
       },
+      
       onStompError: (frame) => {
         console.error('❌ Erreur STOMP:', frame.headers.message);
-        setError('Erreur de connexion STOMP');
+        setError('Erreur de connexion STOMP: ' + frame.headers.message);
       },
     });
 
-    client.activate();
-    stompClient.current = client;
+    try {
+      client.activate();
+      stompClient.current = client;
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'activation:', error);
+      setError('Impossible d\'établir la connexion WebSocket');
+    }
 
     return () => {
-      if (client.connected) {
-        client.deactivate();
+      try {
+        if (client && client.connected) {
+          client.deactivate();
+        }
+      } catch (error) {
+        console.error('Erreur lors de la déconnexion:', error);
       }
     };
   }, [boxInfo, baseUrl]);
