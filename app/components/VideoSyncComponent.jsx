@@ -74,21 +74,38 @@ export default function VideoSyncComponent({ boxId }) {
       .catch((err) => {
         setError("Erreur de récupération utilisateur: " + err.message);
       });
-  }, []);
+  }, [baseUrl, boxId]);
 
   // 🔌 WebSocket
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!boxInfo?.id || !token) return;
 
-    const wsHost = baseUrl.replace(/^https?:\/\//, "");
-    const wsUrl = `https://${wsHost}/ws`; // Force HTTPS en prod
+    // Fonction pour construire l'URL WebSocket correcte
+    const getWebSocketUrl = () => {
+      try {
+        const url = new URL(baseUrl);
+        const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${protocol}//${url.host}/ws`;
+      } catch (error) {
+        console.error('Erreur lors de la construction de l\'URL WebSocket:', error);
+        // Fallback: détecter automatiquement le protocole
+        const isSecure = window.location.protocol === 'https:';
+        const wsProtocol = isSecure ? 'wss:' : 'ws:';
+        const wsHost = baseUrl.replace(/^https?:\/\//, '');
+        return `${wsProtocol}//${wsHost}/ws`;
+      }
+    };
+
+    const wsUrl = getWebSocketUrl();
+    console.log('🔌 Connexion WebSocket à:', wsUrl);
 
     const socket = new SockJS(wsUrl);
     const client = new Client({
       webSocketFactory: () => socket,
       connectHeaders: { Authorization: "Bearer " + token },
       onConnect: () => {
+        console.log('✅ WebSocket connecté');
         setConnected(true);
 
         client.subscribe(`/topic/box/${boxInfo.id}/video-sync`, (message) => {
@@ -117,8 +134,16 @@ export default function VideoSyncComponent({ boxId }) {
         });
       },
       onDisconnect: () => {
+        console.log('❌ WebSocket déconnecté');
         setConnected(false);
-        console.log("Déconnecté WebSocket");
+      },
+      onWebSocketError: (error) => {
+        console.error('❌ Erreur WebSocket:', error);
+        setError('Erreur de connexion WebSocket');
+      },
+      onStompError: (frame) => {
+        console.error('❌ Erreur STOMP:', frame.headers.message);
+        setError('Erreur de connexion STOMP');
       },
     });
 
@@ -126,9 +151,11 @@ export default function VideoSyncComponent({ boxId }) {
     stompClient.current = client;
 
     return () => {
-      client.deactivate();
+      if (client.connected) {
+        client.deactivate();
+      }
     };
-  }, [boxInfo]);
+  }, [boxInfo, baseUrl]);
 
   const sendAction = (action) => {
     if (
@@ -186,16 +213,27 @@ export default function VideoSyncComponent({ boxId }) {
 
   if (error) {
     return (
-      <div className="text-center text-white p-6">
-        <p>{error}</p>
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-black text-white flex items-center justify-center">
+        <div className="text-center p-6 bg-red-900/20 border border-red-500 rounded-lg">
+          <p className="text-red-400 text-lg mb-4">❌ {error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+          >
+            Recharger la page
+          </button>
+        </div>
       </div>
     );
   }
 
   if (!boxInfo) {
     return (
-      <div className="text-center text-white p-6">
-        Chargement de la salle...
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-black text-white flex items-center justify-center">
+        <div className="text-center p-6">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-lg">Chargement de la salle...</p>
+        </div>
       </div>
     );
   }
@@ -205,13 +243,17 @@ export default function VideoSyncComponent({ boxId }) {
       <div className="w-full max-w-6xl bg-gray-800 rounded-2xl overflow-hidden shadow-xl border border-gray-700">
         {/* Header */}
         <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-gray-700">
-          <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-yellow-500">
-            {boxInfo.name}
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-yellow-500">
+              {boxInfo.name}
+            </h2>
+            <div className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} title={connected ? 'Connecté' : 'Déconnecté'} />
+          </div>
           {!syncStarted && (
             <button
               onClick={startSync}
-              className="px-8 py-3 bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg transition-transform transform hover:scale-105 hover:shadow-xl"
+              disabled={!connected}
+              className="px-8 py-3 bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-lg transition-transform transform hover:scale-105 hover:shadow-xl disabled:hover:scale-100"
             >
               ▶️ Démarrer la synchronisation
             </button>
@@ -221,7 +263,7 @@ export default function VideoSyncComponent({ boxId }) {
         {/* Contenu */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-black rounded-xl">
           <div className="md:col-span-2 bg-black rounded-xl overflow-hidden shadow-lg border border-gray-700">
-            {boxInfo.movie?.videoUrl && (
+            {boxInfo.movie?.videoUrl ? (
               <ReactPlayer
                 ref={playerRef}
                 url={boxInfo.movie.videoUrl}
@@ -234,6 +276,10 @@ export default function VideoSyncComponent({ boxId }) {
                 height="500px"
                 className="rounded-xl transition-all duration-300"
               />
+            ) : (
+              <div className="w-full h-96 bg-gray-900 flex items-center justify-center text-gray-400">
+                <p>Aucune vidéo disponible</p>
+              </div>
             )}
           </div>
         </div>
@@ -246,7 +292,7 @@ export default function VideoSyncComponent({ boxId }) {
           >
             {messages.length === 0 ? (
               <p className="text-gray-400 italic">
-                Aucun message pour l’instant...
+                Aucun message pour l'instant...
               </p>
             ) : (
               messages.map((msg, idx) => {
@@ -281,10 +327,12 @@ export default function VideoSyncComponent({ boxId }) {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+              disabled={!connected}
             />
             <button
               onClick={sendMessage}
-              className="px-6 py-3 bg-teal-600 hover:bg-teal-700 transition-all duration-300 ease-in-out transform hover:scale-105 text-white rounded-lg shadow-lg"
+              disabled={!connected || !newMessage.trim()}
+              className="px-6 py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 ease-in-out transform hover:scale-105 text-white rounded-lg shadow-lg"
             >
               💬 Envoyer
             </button>
