@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import * as SockJS from "sockjs-client";
+import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import ReactPlayer from "react-player";
 import MembersSidebar from "../components/MembersSidebar";
@@ -27,14 +27,13 @@ export default function VideoSyncComponent({ boxId }) {
   const [error, setError] = useState(null);
   const [movies, setMovies] = useState([]);
 
-  const chatContainerRef = useRef(null); // Référence au container de chat pour le scroll
+  const chatContainerRef = useRef(null);
 
-  // ajouter un film
   const handleMovieAdded = (newMovie) => {
     setMovies((prevMovies) => [...prevMovies, newMovie]);
   };
 
-  // 🔐 Auth + rejoindre la box
+  // 🔐 Auth + Rejoindre la box
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -52,17 +51,13 @@ export default function VideoSyncComponent({ boxId }) {
         setUsername(data.username || "Moi");
         setUserId(data.id);
 
-        // Étape 1: Rejoindre la box
-        fetch(
-          `${baseUrl}/api/boxes/${boxId}?userId=${data.id}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer " + token,
-            },
-          }
-        )
+        fetch(`${baseUrl}/api/boxes/${boxId}?userId=${data.id}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+        })
           .then((response) => {
             if (!response.ok) {
               throw new Error("Accès refusé à la box");
@@ -77,7 +72,7 @@ export default function VideoSyncComponent({ boxId }) {
           });
       })
       .catch((err) => {
-        setError("❌ Erreur de récupération utilisateur: " + err.message);
+        setError("Erreur de récupération utilisateur: " + err.message);
       });
   }, []);
 
@@ -86,19 +81,13 @@ export default function VideoSyncComponent({ boxId }) {
     const token = localStorage.getItem("token");
     if (!boxInfo?.id || !token) return;
 
-    // Construire l'URL du WebSocket en fonction du protocole (http / https)
-    const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
-
-    // Extraire l'hôte sans protocole du baseUrl (ex: cinemamongo-production.up.railway.app)
     const wsHost = baseUrl.replace(/^https?:\/\//, "");
-
-    // URL complète du socket
-    const wsUrl = `${wsProtocol}://${wsHost}/ws`;
+    const wsUrl = `https://${wsHost}/ws`; // Force HTTPS en prod
 
     const socket = new SockJS(wsUrl);
-
     const client = new Client({
       webSocketFactory: () => socket,
+      connectHeaders: { Authorization: "Bearer " + token },
       onConnect: () => {
         setConnected(true);
 
@@ -129,7 +118,7 @@ export default function VideoSyncComponent({ boxId }) {
       },
       onDisconnect: () => {
         setConnected(false);
-        console.log("❌ Déconnecté WebSocket");
+        console.log("Déconnecté WebSocket");
       },
     });
 
@@ -141,7 +130,6 @@ export default function VideoSyncComponent({ boxId }) {
     };
   }, [boxInfo]);
 
-  // ▶️ Envoyer action vidéo
   const sendAction = (action) => {
     if (
       stompClient.current &&
@@ -161,10 +149,7 @@ export default function VideoSyncComponent({ boxId }) {
 
       stompClient.current.publish({
         destination: `/app/box/${boxInfo.id}/video-sync`,
-        body: JSON.stringify({
-          action,
-          time: currentTime,
-        }),
+        body: JSON.stringify({ action, time: currentTime }),
       });
 
       console.log("📤 [SYNC]", action, "@", currentTime);
@@ -192,7 +177,6 @@ export default function VideoSyncComponent({ boxId }) {
     setNewMessage("");
   };
 
-  // Scrolling automatique vers le bas lorsque un message est ajouté
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop =
@@ -219,7 +203,7 @@ export default function VideoSyncComponent({ boxId }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-black text-white p-8 flex flex-col items-center font-sans">
       <div className="w-full max-w-6xl bg-gray-800 rounded-2xl overflow-hidden shadow-xl border border-gray-700">
-        {/* HEADER */}
+        {/* Header */}
         <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-gray-700">
           <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-yellow-500">
             {boxInfo.name}
@@ -234,9 +218,8 @@ export default function VideoSyncComponent({ boxId }) {
           )}
         </div>
 
-        {/* CONTENU PRINCIPAL */}
+        {/* Contenu */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-black rounded-xl">
-          {/* VIDEO */}
           <div className="md:col-span-2 bg-black rounded-xl overflow-hidden shadow-lg border border-gray-700">
             {boxInfo.movie?.videoUrl && (
               <ReactPlayer
@@ -255,7 +238,7 @@ export default function VideoSyncComponent({ boxId }) {
           </div>
         </div>
 
-        {/* CHAT */}
+        {/* Chat */}
         <div className="p-6 bg-gray-800 border-t border-gray-700 w-full rounded-xl shadow-lg">
           <div
             ref={chatContainerRef}
