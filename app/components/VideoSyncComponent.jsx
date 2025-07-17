@@ -82,14 +82,10 @@ export default function VideoSyncComponent({ boxId }) {
     if (!boxInfo?.id || !token) return;
 
     // Fonction pour construire l'URL WebSocket correcte
-  const wsUrl = `${baseUrl}/ws`; // Exemple: https://cinema-backend-production.up.railway.app/ws
+  const wsUrl = `https://cinemamongo-production.up.railway.app/ws`; // Exemple: https://cinema-backend-production.up.railway.app/ws
 
 
-    // Option 1: Utiliser WebSocket natif si SockJS pose problème
-    if (window.location.protocol === 'https:' && !wsUrl.startsWith('wss:')) {
-      setError('Configuration WebSocket incorrecte pour HTTPS');
-      return;
-    }
+    
 
     // Configuration du client STOMP
     const client = new Client({
