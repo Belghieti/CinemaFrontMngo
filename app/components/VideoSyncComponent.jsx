@@ -10,15 +10,12 @@ import InvitationsModal from "./InvitationsModal";
 import InvitationsPage from "./Invitation";
 
 export default function VideoSyncComponent({ boxId }) {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ;
   
   // WebSocket URL configuration for different environments
   const getWebSocketUrl = () => {
-    if (process.env.NODE_ENV === 'production') {
       return process.env.NEXT_PUBLIC_WS_URL || "wss://cinemamongo-production.up.railway.app/websocket";
-    } else {
-      return process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/websocket";
-    }
+    
   };
 
   const playerRef = useRef(null);
