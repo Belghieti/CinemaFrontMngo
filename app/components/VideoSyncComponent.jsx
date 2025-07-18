@@ -8,15 +8,16 @@ import AddMovieForm from "../components/AddMovieForm";
 import CreateBoxForm from "./CreateBoxForm";
 import InvitationsModal from "./InvitationsModal";
 import InvitationsPage from "./Invitation";
+import SockJS from "sockjs-client";
+
 
 export default function VideoSyncComponent({ boxId }) {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ;
   
   // WebSocket URL configuration for different environments
-  const getWebSocketUrl = () => {
-      return process.env.NEXT_PUBLIC_WS_URL || "wss://cinemamongo-production.up.railway.app/websocket";
-    
-  };
+ const getSockJsUrl = () => {
+  return process.env.NEXT_PUBLIC_SOCKJS_URL || "https://cinemamongo-production.up.railway.app/websocket";
+};
 
   const playerRef = useRef(null);
   const stompClient = useRef(null);
@@ -128,6 +129,7 @@ export default function VideoSyncComponent({ boxId }) {
 
     fetchUserAndBox();
   }, [baseUrl, boxId]);
+   const sockJsUrl = getSockJsUrl();
 
   // WebSocket connection with retry logic
   const connectWebSocket = async () => {
@@ -147,7 +149,7 @@ export default function VideoSyncComponent({ boxId }) {
       await testWebSocketConnection(wsUrl);
       
       const client = new Client({
-        brokerURL: wsUrl,
+         webSocketFactory: () => new SockJS(sockJsUrl),
         connectHeaders: {
           Authorization: `Bearer ${token}`,
         },
