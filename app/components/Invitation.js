@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Client } from "@stomp/stompjs";
 import { useRouter } from "next/navigation";
 
 export default function InvitationsPage() {
@@ -15,7 +16,7 @@ export default function InvitationsPage() {
 
     setToken(storedToken);
 
-    // Chargement initial des invitations
+    // Chargement initial des invitations via REST
     fetch(`${baseUrl}/api/invitations/received`, {
       headers: {
         Authorization: `Bearer ${storedToken}`,
@@ -32,20 +33,32 @@ export default function InvitationsPage() {
         console.error("Erreur lors du chargement des invitations :", err)
       );
 
-    // Connexion WebSocket pour recevoir les invitations en temps réel
-   const socket = new WebSocket(`wss://cinemamongo-production.up.railway.app/ws`);
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+    // Connexion WebSocket via STOMP.js avec token en header
+    const client = new Client({
+      brokerURL: `wss://cinemamongo-production.up.railway.app/ws`,
+      connectHeaders: {
+        Authorization: `Bearer ${storedToken}`,
+      },
+      reconnectDelay: 5000,
+      onConnect: () => {
+        client.subscribe("/topic/invitations", (message) => {
+          const data = JSON.parse(message.body);
+          if (data.type === "invitation") {
+            setInvitations((prev) => [...prev, data.invitation]);
+          }
+        });
+      },
+      onStompError: (frame) => {
+        console.error("Erreur STOMP : ", frame.headers["message"]);
+      },
+    });
 
-      // Vérifie si c'est une invitation
-      if (data.type === "invitation") {
-        // Si c'est une invitation, on met à jour l'état en ajoutant l'invitation
-        setInvitations((prev) => [...prev, data.invitation]);
-      }
+    client.activate();
+
+    return () => {
+      client.deactivate();
     };
-
-    return () => socket.close(); // Fermeture de la connexion WebSocket au déchargement du composant
-  }, []);
+  }, [baseUrl]);
 
   const handleAccept = async (invitationId) => {
     try {
