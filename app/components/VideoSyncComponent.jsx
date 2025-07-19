@@ -13,21 +13,19 @@ export default function VideoSyncComponent({ boxId }) {
   const [syncStarted, setSyncStarted] = useState(false);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
-  const lastSeekTime = useRef(null);
-
   const [username, setUsername] = useState("Moi");
   const [userId, setUserId] = useState(null);
   const [boxInfo, setBoxInfo] = useState(null);
   const [error, setError] = useState(null);
-
   const chatContainerRef = useRef(null);
+  const lastSeekTime = useRef(0);
+  const suppressEvent = useRef(false);
 
-  // 1. Récupération info utilisateur + box
+  // ✅ 1. Charger infos utilisateur + box
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
-      setError("Token non trouvé.");
-      console.error("Token non trouvé.");
+      setError("Token non trouvé");
       return;
     }
 
@@ -35,42 +33,38 @@ export default function VideoSyncComponent({ boxId }) {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
-      .then((data) => {
-        console.log("👤 Utilisateur récupéré:", data);
-        setUsername(data.username || "Moi");
-        setUserId(data.id);
+      .then((user) => {
+        console.log("👤 Utilisateur:", user);
+        setUsername(user.username);
+        setUserId(user.id);
 
         return fetch(
-          `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}?userId=${data.id}`,
+          `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}?userId=${user.id}`,
           {
-            method: "GET",
             headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer " + token,
+              Authorization: `Bearer ${token}`,
             },
           }
         );
       })
-      .then((response) => {
-        if (!response.ok) throw new Error("Accès refusé à la box");
-        return response.json();
+      .then((res) => {
+        if (!res.ok) throw new Error("Accès refusé à la box");
+        return res.json();
       })
-      .then((boxData) => {
-        console.log("📦 Infos box reçues :", boxData);
-        setBoxInfo(boxData);
+      .then((data) => {
+        console.log("📦 Box reçue:", data);
+        setBoxInfo(data);
       })
       .catch((err) => {
-        setError("Erreur lors de l'accès à la box: " + err.message);
-        console.error("Erreur lors de l'accès à la box:", err);
+        console.error("Erreur:", err);
+        setError("Erreur: " + err.message);
       });
   }, [boxId]);
 
-  // 2. Connexion WebSocket et abonnements
+  // ✅ 2. Connexion WebSocket
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!boxInfo?.id || !token) return;
-
-    console.log("🌐 Tentative connexion WebSocket...");
 
     const client = new Client({
       webSocketFactory: () =>
@@ -78,48 +72,43 @@ export default function VideoSyncComponent({ boxId }) {
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
       onConnect: () => {
-        setConnected(true);
         console.log("✅ WebSocket connecté");
+        setConnected(true);
 
-        client.subscribe(`/topic/box/${boxInfo.id}/video-sync`, (message) => {
-          console.log("🎬 Reçu VIDEO-SYNC :", message.body);
-          const data = JSON.parse(message.body);
+        client.subscribe(`/topic/box/${boxInfo.id}/video-sync`, (msg) => {
+          const data = JSON.parse(msg.body);
+          console.log("🎬 Reçu:", data);
+
           if (!playerRef.current) return;
+          suppressEvent.current = true;
 
-          switch (data.action) {
-            case "play":
-              console.log("▶️ Play reçu, seek à", data.time);
-              playerRef.current.seekTo(data.time);
-              setPlaying(true);
-              break;
-            case "pause":
-              console.log("⏸️ Pause reçu, seek à", data.time);
-              playerRef.current.seekTo(data.time);
-              setPlaying(false);
-              break;
-            case "seek":
-              console.log("⏩ Seek reçu à", data.time);
-              lastSeekTime.current = data.time;
-              playerRef.current.seekTo(data.time);
-              break;
-            default:
-              console.warn("Action inconnue reçue:", data.action);
+          if (data.action === "play") {
+            playerRef.current.seekTo(data.time || 0);
+            setPlaying(true);
+          } else if (data.action === "pause") {
+            playerRef.current.seekTo(data.time || 0);
+            setPlaying(false);
+          } else if (data.action === "seek") {
+            playerRef.current.seekTo(data.time || 0);
           }
+
+          setTimeout(() => {
+            suppressEvent.current = false;
+          }, 500);
         });
 
-        client.subscribe(`/topic/box/${boxInfo.id}/chat`, (message) => {
-          console.log("💬 Reçu MESSAGE :", message.body);
-          const data = JSON.parse(message.body);
+        client.subscribe(`/topic/box/${boxInfo.id}/chat`, (msg) => {
+          const data = JSON.parse(msg.body);
+          console.log("💬 Message reçu:", data);
           setMessages((prev) => [...prev, data]);
         });
       },
       onDisconnect: () => {
+        console.warn("❌ WebSocket déconnecté");
         setConnected(false);
-        console.warn("❌ Déconnecté WebSocket");
       },
       onStompError: (frame) => {
-        console.error("🚨 STOMP error:", frame.headers["message"]);
-        console.error("Détails :", frame.body);
+        console.error("🚨 STOMP Error:", frame.body);
       },
     });
 
@@ -127,69 +116,48 @@ export default function VideoSyncComponent({ boxId }) {
     stompClient.current = client;
 
     return () => {
-      console.log("🛑 Déconnexion WebSocket");
       client.deactivate();
+      console.log("🛑 WS déconnecté");
     };
   }, [boxInfo]);
 
-  // 3. Envoyer actions vidéo
+  // ✅ 3. Événements vidéo (locaux → envoi WS)
   const sendAction = (action) => {
-    if (
-      stompClient.current &&
-      stompClient.current.connected &&
-      playerRef.current
-    ) {
-      const currentTime = playerRef.current.getCurrentTime?.() || 0;
+    if (!stompClient.current?.connected || !playerRef.current) return;
+    const time = playerRef.current.getCurrentTime() || 0;
 
-      if (action === "seek" && lastSeekTime.current !== null) {
-        const diff = Math.abs(currentTime - lastSeekTime.current);
-        if (diff < 0.1) {
-          console.log("⏩ Ignorer seek très proche");
-          return;
-        }
-      }
+    console.log("📤 Envoi:", action, "@", time.toFixed(2));
 
-      if (action === "seek") lastSeekTime.current = currentTime;
-
-      console.log("📤 Envoi action vidéo:", action, "à", currentTime);
-
-      stompClient.current.publish({
-        destination: `/app/box/${boxInfo.id}/video-sync`,
-        body: JSON.stringify({ action, time: currentTime }),
-      });
-    } else {
-      console.warn(
-        "🚫 Impossible d'envoyer action, pas connecté ou player manquant"
-      );
-    }
+    stompClient.current.publish({
+      destination: `/app/box/${boxInfo.id}/video-sync`,
+      body: JSON.stringify({ action, time }),
+    });
   };
 
-  // 4. Démarrer la synchro
-  const startSync = () => {
-    setSyncStarted(true);
-    console.log("▶️ Démarrage synchronisation vidéo");
-    sendAction("play");
+  // ✅ 4. Contrôle de ReactPlayer
+  const handlePlay = () => {
+    if (!suppressEvent.current) sendAction("play");
+    setPlaying(true);
   };
 
-  // 5. Envoyer un message chat
+  const handlePause = () => {
+    if (!suppressEvent.current) sendAction("pause");
+    setPlaying(false);
+  };
+
+  const handleSeek = () => {
+    if (!suppressEvent.current) sendAction("seek");
+  };
+
+  // ✅ 5. Envoyer un message chat
   const sendMessage = () => {
-    if (!newMessage.trim()) {
-      console.warn("⚠️ Message vide, non envoyé");
-      return;
-    }
-    if (!stompClient.current?.connected) {
-      console.warn("🚫 WebSocket non connecté, message non envoyé");
-      return;
-    }
-
+    if (!newMessage.trim()) return;
     const msg = {
       sender: username,
       content: newMessage.trim(),
     };
 
-    console.log("📤 Envoi message chat:", msg);
-
-    stompClient.current.publish({
+    stompClient.current?.publish({
       destination: `/app/box/${boxInfo.id}/chat`,
       body: JSON.stringify(msg),
     });
@@ -197,7 +165,6 @@ export default function VideoSyncComponent({ boxId }) {
     setNewMessage("");
   };
 
-  // 6. Scroll automatique chat
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop =
@@ -207,7 +174,7 @@ export default function VideoSyncComponent({ boxId }) {
 
   if (error) {
     return (
-      <div className="text-center text-white p-6">
+      <div className="text-red-400 text-center p-6">
         <p>{error}</p>
       </div>
     );
@@ -215,9 +182,7 @@ export default function VideoSyncComponent({ boxId }) {
 
   if (!boxInfo) {
     return (
-      <div className="text-center text-white p-6">
-        Chargement de la salle...
-      </div>
+      <div className="text-white text-center p-6">Chargement de la box...</div>
     );
   }
 
@@ -231,23 +196,26 @@ export default function VideoSyncComponent({ boxId }) {
             ref={playerRef}
             url={boxInfo.movie.videoUrl}
             playing={playing}
-            onPlay={() => sendAction("play")}
-            onPause={() => sendAction("pause")}
-            onSeek={() => sendAction("seek")}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onSeek={handleSeek}
             controls
             width="100%"
             height="500px"
           />
         ) : (
-          <p className="text-red-400">
+          <p className="text-yellow-400">
             ⚠️ Pas de vidéo disponible pour cette box.
           </p>
         )}
 
         {!syncStarted && (
           <button
-            onClick={startSync}
-            className="bg-teal-600 hover:bg-teal-700 px-6 py-3 rounded text-white"
+            onClick={() => {
+              setSyncStarted(true);
+              sendAction("play");
+            }}
+            className="bg-teal-600 hover:bg-teal-700 px-6 py-3 rounded"
           >
             ▶️ Démarrer la synchronisation
           </button>
