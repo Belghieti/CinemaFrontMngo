@@ -4,11 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import * as SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import ReactPlayer from "react-player";
-import MembersSidebar from "../components/MembersSidebar";
-import AddMovieForm from "../components/AddMovieForm";
-import CreateBoxForm from "./CreateBoxForm";
-import InvitationsModal from "./InvitationsModal";
-import InvitationsPage from "./Invitation";
 
 export default function VideoSyncComponent({ boxId }) {
   const playerRef = useRef(null);
@@ -24,16 +19,9 @@ export default function VideoSyncComponent({ boxId }) {
   const [userId, setUserId] = useState(null);
   const [boxInfo, setBoxInfo] = useState(null);
   const [error, setError] = useState(null);
-  const [movies, setMovies] = useState([]);
 
-  const chatContainerRef = useRef(null); // Référence au container de chat pour le scroll
+  const chatContainerRef = useRef(null);
 
-  // ajouter un film
-  const handleMovieAdded = (newMovie) => {
-    setMovies((prevMovies) => [...prevMovies, newMovie]);
-  };
-
-  // 🔐 Auth + rejoindre la box
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -42,17 +30,13 @@ export default function VideoSyncComponent({ boxId }) {
     }
 
     fetch("https://cinemamongo-production.up.railway.app/auth/getUserInfo", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data) => {
         setUsername(data.username || "Moi");
         setUserId(data.id);
-
-        // Étape 1: Rejoindre la box
-        fetch(
+        return fetch(
           `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}?userId=${data.id}`,
           {
             method: "GET",
@@ -61,38 +45,26 @@ export default function VideoSyncComponent({ boxId }) {
               Authorization: "Bearer " + token,
             },
           }
-        )
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error("Accès refusé à la box");
-            }
-            return response.json();
-          })
-          .then((boxData) => {
-            setBoxInfo(boxData);
-          })
-          .catch((err) => {
-            setError("Erreur lors de l'accès à la box: " + err.message);
-          });
+        );
       })
-      .catch((err) => {
-        setError("❌ Erreur de récupération utilisateur: " + err.message);
-      });
+      .then((response) => {
+        if (!response.ok) throw new Error("Accès refusé à la box");
+        return response.json();
+      })
+      .then((boxData) => setBoxInfo(boxData))
+      .catch((err) =>
+        setError("Erreur lors de l'accès à la box: " + err.message)
+      );
   }, []);
 
-  // 🔌 WebSocket
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!boxInfo?.id || !token) return;
 
-    //const socket = new WebSocket(`wss://cinemamongo-production.up.railway.app/ws`);
-    
     const client = new Client({
-      // webSocketFactory: () => socket,
-      brokerURL: `wss://cinemamongo-production.up.railway.app/ws`,
-      connectHeaders: {
-        Authorization: `Bearer ${token}`, // <-- ✅ Token ici !
-      },
+      webSocketFactory: () =>
+        new SockJS("https://cinemamongo-production.up.railway.app/ws"),
+      connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
       onConnect: () => {
         setConnected(true);
@@ -131,12 +103,9 @@ export default function VideoSyncComponent({ boxId }) {
     client.activate();
     stompClient.current = client;
 
-    return () => {
-      client.deactivate();
-    };
+    return () => client.deactivate();
   }, [boxInfo]);
 
-  // ▶️ Envoyer action vidéo
   const sendAction = (action) => {
     if (
       stompClient.current &&
@@ -150,19 +119,12 @@ export default function VideoSyncComponent({ boxId }) {
         if (diff < 0.1) return;
       }
 
-      if (action === "seek") {
-        lastSeekTime.current = currentTime;
-      }
+      if (action === "seek") lastSeekTime.current = currentTime;
 
       stompClient.current.publish({
         destination: `/app/box/${boxInfo.id}/video-sync`,
-        body: JSON.stringify({
-          action,
-          time: currentTime,
-        }),
+        body: JSON.stringify({ action, time: currentTime }),
       });
-
-      console.log("📤 [SYNC]", action, "@", currentTime);
     }
   };
 
@@ -187,7 +149,6 @@ export default function VideoSyncComponent({ boxId }) {
     setNewMessage("");
   };
 
-  // Scrolling automatique vers le bas lorsque un message est ajouté
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop =
@@ -196,99 +157,61 @@ export default function VideoSyncComponent({ boxId }) {
   }, [messages]);
 
   if (error) {
-    return (
-      <div className="text-center text-white p-6">
-        <p>{error}</p>
-      </div>
-    );
+    return <div className="text-center text-white p-6">{error}</div>;
   }
 
   if (!boxInfo) {
-    return (
-      <div className="text-center text-white p-6">
-        Chargement de la salle...
-      </div>
-    );
+    return <div className="text-center text-white p-6">Chargement...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-black text-white p-8 flex flex-col items-center font-sans">
-      <div className="w-full max-w-6xl bg-gray-800 rounded-2xl overflow-hidden shadow-xl border border-gray-700">
-        {/* HEADER */}
-        <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-gray-700">
-          <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-yellow-500">
-            {boxInfo.name}
-          </h2>
-          {!syncStarted && (
-            <button
-              onClick={startSync}
-              className="px-8 py-3 bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg transition-transform transform hover:scale-105 hover:shadow-xl"
-            >
-              ▶️ Démarrer la synchronisation
-            </button>
-          )}
-        </div>
+    <div className="min-h-screen bg-black text-white p-6 flex flex-col items-center">
+      <div className="w-full max-w-6xl space-y-6">
+        <h1 className="text-3xl font-bold">{boxInfo.name}</h1>
 
-        {/* CONTENU PRINCIPAL */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-black rounded-xl">
-          {/* VIDEO */}
-          <div className="md:col-span-2 bg-black rounded-xl overflow-hidden shadow-lg border border-gray-700">
-            {boxInfo.movie?.videoUrl && (
-              <ReactPlayer
-                ref={playerRef}
-                url={boxInfo.movie.videoUrl}
-                playing={playing}
-                onPlay={() => sendAction("play")}
-                onPause={() => sendAction("pause")}
-                onSeek={() => sendAction("seek")}
-                controls
-                width="100%"
-                height="500px"
-                className="rounded-xl transition-all duration-300"
-              />
-            )}
-          </div>
-        </div>
+        {boxInfo.movie?.videoUrl && (
+          <ReactPlayer
+            ref={playerRef}
+            url={boxInfo.movie.videoUrl}
+            playing={playing}
+            onPlay={() => sendAction("play")}
+            onPause={() => sendAction("pause")}
+            onSeek={() => sendAction("seek")}
+            controls
+            width="100%"
+            height="500px"
+          />
+        )}
 
-        {/* CHAT */}
-        <div className="p-6 bg-gray-800 border-t border-gray-700 w-full rounded-xl shadow-lg">
+        {!syncStarted && (
+          <button
+            onClick={startSync}
+            className="bg-teal-600 hover:bg-teal-700 px-6 py-3 rounded text-white"
+          >
+            ▶️ Démarrer la synchronisation
+          </button>
+        )}
+
+        <div className="bg-gray-800 p-4 rounded-lg space-y-4">
           <div
             ref={chatContainerRef}
-            className="w-full h-64 overflow-y-auto bg-gray-900 border border-gray-700 rounded-lg p-4 mb-4 space-y-4 scroll-smooth"
+            className="h-64 overflow-y-auto bg-gray-900 rounded p-3 space-y-2"
           >
             {messages.length === 0 ? (
-              <p className="text-gray-400 italic">
-                Aucun message pour l’instant...
-              </p>
+              <p className="text-gray-400 italic">Aucun message</p>
             ) : (
-              messages.map((msg, idx) => {
-                const isMine = msg.sender === username;
-                return (
-                  <div
-                    key={idx}
-                    className={`flex ${
-                      isMine ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`max-w-xs md:max-w-sm break-words px-4 py-3 rounded-lg shadow-md transition-all duration-300 ease-in-out transform ${
-                        isMine
-                          ? "bg-teal-500 text-white rounded-br-none"
-                          : "bg-gray-300 text-black rounded-bl-none"
-                      }`}
-                    >
-                      <p className="text-xs font-semibold mb-1">{msg.sender}</p>
-                      <p className="text-sm">{msg.content}</p>
-                    </div>
-                  </div>
-                );
-              })
+              messages.map((msg, i) => (
+                <div key={i} className="text-sm">
+                  <strong>{msg.sender}:</strong> {msg.content}
+                </div>
+              ))
             )}
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full">
+
+          <div className="flex gap-2">
             <input
               type="text"
-              className="flex-1 bg-gray-700 text-white px-6 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all duration-300 ease-in-out transform"
+              className="flex-1 bg-gray-700 text-white px-4 py-2 rounded"
               placeholder="Écris un message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
@@ -296,9 +219,9 @@ export default function VideoSyncComponent({ boxId }) {
             />
             <button
               onClick={sendMessage}
-              className="px-6 py-3 bg-teal-600 hover:bg-teal-700 transition-all duration-300 ease-in-out transform hover:scale-105 text-white rounded-lg shadow-lg"
+              className="bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded text-white"
             >
-              💬 Envoyer
+              Envoyer
             </button>
           </div>
         </div>
