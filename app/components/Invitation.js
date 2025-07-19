@@ -33,7 +33,7 @@ export default function InvitationsPage() {
       );
 
     // Connexion WebSocket pour recevoir les invitations en temps réel
-    const socket = new WebSocket(`ws:${baseUrl}/ws`); // Assure-toi que l'URL est correcte
+   const socket = new WebSocket(`wss://cinemamongo-production.up.railway.app/ws`);
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
