@@ -85,7 +85,7 @@ export default function VideoSyncComponent({ boxId }) {
     const token = localStorage.getItem("token");
     if (!boxInfo?.id || !token) return;
 
-    const socket = new SockJS("http://192.168.1.122:8080/ws");
+    const socket = new SockJS(`${process.env.NEXT_PUBLIC_API_BASE_URL}/ws`);
     const client = new Client({
       webSocketFactory: () => socket,
       onConnect: () => {
