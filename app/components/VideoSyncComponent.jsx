@@ -41,7 +41,7 @@ export default function VideoSyncComponent({ boxId }) {
       return;
     }
 
-    fetch("http://192.168.1.122:8080/auth/getUserInfo", {
+    fetch("https://cinemamongo-production.up.railway.app/auth/getUserInfo", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -53,7 +53,7 @@ export default function VideoSyncComponent({ boxId }) {
 
         // Étape 1: Rejoindre la box
         fetch(
-          `http://192.168.1.122:8080/api/boxes/${boxId}?userId=${data.id}`,
+          `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}?userId=${data.id}`,
           {
             method: "GET",
             headers: {
