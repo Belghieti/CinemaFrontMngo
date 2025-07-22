@@ -3,18 +3,40 @@ import { Client } from "@stomp/stompjs";
 import ReactPlayer from "react-player";
 
 export default function VideoSyncComponent({ boxId }) {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
   const playerRef = useRef(null);
   const stompClient = useRef(null);
   const chatContainerRef = useRef(null);
   const invitContainerRef = useRef(null);
-  const suppressEvent = useRef(false); // Pour ignorer les événements causés par réception WS
-  const seekTimeout = useRef(null); // Pour debounce du seek
+  const suppressEvent = useRef(false);
+  const seekTimeout = useRef(null);
 
   const [connected, setConnected] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [invitations, setInvitations] = useState([]);
+  const [videoUrl, setVideoUrl] = useState(""); // <- ici
+
+  useEffect(() => {
+    const fetchBoxMovie = async () => {
+      try {
+        const res = await fetch(`${baseUrl}/api/boxes/${boxId}`);
+        const data = await res.json();
+
+        if (data.movie && data.movie.videoUrl) {
+          setVideoUrl(data.movie.videoUrl);
+        } else {
+          console.error("🎥 Aucun film trouvé pour cette Box");
+        }
+      } catch (err) {
+        console.error("Erreur lors du chargement de la box:", err);
+      }
+    };
+
+    fetchBoxMovie();
+  }, [boxId, baseUrl]);
 
   useEffect(() => {
     const client = new Client({
@@ -28,17 +50,13 @@ export default function VideoSyncComponent({ boxId }) {
           const videoMessage = JSON.parse(msg.body);
           console.log("🎬 Action vidéo reçue :", videoMessage);
 
-          suppressEvent.current = true; // Bloquer les événements locaux pendant la sync
+          suppressEvent.current = true;
 
-          if (videoMessage.action === "play") {
-            setPlaying(true);
-          } else if (videoMessage.action === "pause") {
-            setPlaying(false);
-          } else if (videoMessage.action === "seek" && playerRef.current) {
+          if (videoMessage.action === "play") setPlaying(true);
+          else if (videoMessage.action === "pause") setPlaying(false);
+          else if (videoMessage.action === "seek" && playerRef.current)
             playerRef.current.seekTo(videoMessage.time || 0);
-          }
 
-          // Réactiver les événements locaux après un délai (500ms)
           setTimeout(() => {
             suppressEvent.current = false;
           }, 500);
@@ -68,7 +86,7 @@ export default function VideoSyncComponent({ boxId }) {
   }, [boxId]);
 
   const sendVideoAction = (action, time = null) => {
-    if (!stompClient.current || !stompClient.current.connected) return;
+    if (!stompClient.current?.connected) return;
 
     const payload = { action };
     if (time !== null) payload.time = time;
@@ -83,7 +101,7 @@ export default function VideoSyncComponent({ boxId }) {
   };
 
   const handlePlay = () => {
-    if (suppressEvent.current) return; // Ne rien faire si c'est une sync distante
+    if (suppressEvent.current) return;
     sendVideoAction("play");
   };
 
@@ -92,7 +110,6 @@ export default function VideoSyncComponent({ boxId }) {
     sendVideoAction("pause");
   };
 
-  // Debounce : envoie le seek seulement 300ms après le dernier mouvement utilisateur
   const handleSeek = (seconds) => {
     if (suppressEvent.current) return;
 
@@ -102,10 +119,8 @@ export default function VideoSyncComponent({ boxId }) {
     }, 300);
   };
 
-  // Envoi message chat
   const sendMessage = () => {
-    if (!newMessage.trim()) return;
-    if (!stompClient.current || !stompClient.current.connected) return;
+    if (!newMessage.trim() || !stompClient.current?.connected) return;
 
     const msg = {
       sender: "Moi",
@@ -122,20 +137,24 @@ export default function VideoSyncComponent({ boxId }) {
 
   return (
     <div>
-      <h2>🎥 Composant Synchronisation Vidéo</h2>
+      <h2>🎥 Lecture synchronisée</h2>
 
-      <ReactPlayer
-        ref={playerRef}
-        url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrsdui5bgeyf3tkump5r2i3m4jxtdl5cyi3fyab46c37ha3ys4tivm7jm7d5tcgczaya7fi/Angel__x27_s.Last_Mission._Love.S01.E05.720p.WeCima.Show.mp4"
-        playing={playing}
-        controls={true}
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onSeek={handleSeek}
-        width="100%"
-      />
+      {videoUrl ? (
+        <ReactPlayer
+          ref={playerRef}
+          url={videoUrl}
+          playing={playing}
+          controls
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onSeek={handleSeek}
+          width="100%"
+        />
+      ) : (
+        <p>Chargement de la vidéo...</p>
+      )}
 
-      {!connected && <p>🕐 Connexion au serveur en cours...</p>}
+      {!connected && <p>🕐 Connexion au serveur WebSocket...</p>}
 
       <section style={{ marginTop: 20 }}>
         <h3>💬 Chat</h3>
