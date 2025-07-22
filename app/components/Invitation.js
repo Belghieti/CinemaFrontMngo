@@ -36,10 +36,10 @@ export default function InvitationsPage() {
     // Connexion WebSocket via STOMP.js avec token en header
     const client = new Client({
       brokerURL: `wss://cinemamongo-production.up.railway.app/ws`,
-      connectHeaders: {
-        Authorization: `Bearer ${storedToken}`,
-      },
-      reconnectDelay: 5000,
+      //connectHeaders: {
+        //Authorization: `Bearer ${storedToken}`,
+      //},
+      //reconnectDelay: 5000,
       onConnect: () => {
         client.subscribe("/topic/invitations", (message) => {
           const data = JSON.parse(message.body);
