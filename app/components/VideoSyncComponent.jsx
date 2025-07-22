@@ -61,9 +61,11 @@ export default function VideoSyncComponent({ boxId }) {
     if (!boxInfo?.id || !token) return;
 
     const client = new Client({
-      webSocketFactory: () =>
-        new SockJS("https://cinemamongo-production.up.railway.app/ws-sockjs"),
-      //connectHeaders: { Authorization: `Bearer ${token}` },
+      //webSocketFactory: () =>
+       // new SockJS("https://cinemamongo-production.up.railway.app/ws-sockjs"),
+        brokerURL: "wss://cinemamongo-production.up.railway.app/ws", // WebSocket natif
+
+        //connectHeaders: { Authorization: `Bearer ${token}` },
      // reconnectDelay: 5000,
       onConnect: () => {
         console.log("✅ WebSocket connecté");
