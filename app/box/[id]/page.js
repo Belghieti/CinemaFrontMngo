@@ -133,7 +133,7 @@ export default function BoxPage() {
         <div className="flex flex-col md:flex-row gap-8">
           {/* Composant vidéo */}
           <div className="flex-1 bg-white/5 p-6 rounded-2xl shadow-lg">
-            <VideoSyncComponent boxId={id} />
+            <VideoSyncComponent boxId={id} boxInfo={boxInfo} />
           </div>
 
           {/* Bloc invitation */}
