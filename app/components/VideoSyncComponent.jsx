@@ -1,168 +1,158 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import * as SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import ReactPlayer from "react-player";
 
 export default function VideoSyncComponent({ boxId }) {
   const playerRef = useRef(null);
   const stompClient = useRef(null);
+  const chatContainerRef = useRef(null);
+  const invitContainerRef = useRef(null);
 
   const [connected, setConnected] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
-  const [invitedUser, setInvitedUser] = useState("");
+  const [invitations, setInvitations] = useState([]);
 
-  // === Connexion WebSocket ===
+  // Connexion WebSocket + abonnements
   useEffect(() => {
-    const socket = new SockJS(
-      "https://cinemamongo-production.up.railway.app/ws"
-    );
     const client = new Client({
-      webSocketFactory: () => socket,
+      brokerURL: `wss://cinemamongo-production.up.railway.app/ws`,
       reconnectDelay: 5000,
-      debug: (str) => console.log("[STOMP DEBUG]:", str),
+      onConnect: () => {
+        console.log("✅ Connecté au serveur WebSocket");
+        setConnected(true);
+
+        // Synchro vidéo
+        client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
+          const videoMessage = JSON.parse(msg.body);
+          console.log("🎬 Action vidéo reçue :", videoMessage);
+          if (videoMessage.action === "play") setPlaying(true);
+          else if (videoMessage.action === "pause") setPlaying(false);
+        });
+
+        // Chat
+        client.subscribe(`/topic/box/${boxId}/chat`, (msg) => {
+          const chatMsg = JSON.parse(msg.body);
+          setMessages((prev) => [...prev, chatMsg]);
+        });
+
+        // Invitations
+        client.subscribe(`/topic/box/${boxId}/invitations`, (msg) => {
+          const invMsg = JSON.parse(msg.body);
+          setInvitations((prev) => [...prev, invMsg]);
+        });
+      },
+      onStompError: (frame) => {
+        console.error("❌ Erreur STOMP :", frame.headers["message"]);
+      },
     });
-
-    client.onConnect = () => {
-      console.log("✅ WebSocket connecté");
-      setConnected(true);
-
-      // Souscription aux messages vidéo
-      client.subscribe(`/topic/box/${boxId}/video-sync`, (message) => {
-        const msg = JSON.parse(message.body);
-        console.log("🎬 Message vidéo reçu :", msg);
-
-        if (msg.action === "play") {
-          setPlaying(true);
-        } else if (msg.action === "pause") {
-          setPlaying(false);
-        }
-      });
-
-      // Souscription aux messages de chat
-      client.subscribe(`/topic/box/${boxId}/chat`, (message) => {
-        const msg = JSON.parse(message.body);
-        setMessages((prev) => [...prev, msg]);
-      });
-
-      // Souscription aux invitations
-      client.subscribe(`/topic/box/${boxId}/invitations`, (message) => {
-        const invite = JSON.parse(message.body);
-        alert(`📨 Invitation reçue pour: ${invite.invitedUsername}`);
-      });
-    };
 
     client.activate();
     stompClient.current = client;
 
     return () => {
-      if (stompClient.current) stompClient.current.deactivate();
+      client.deactivate();
     };
   }, [boxId]);
 
-  // === Contrôle de lecture vidéo ===
-  const handlePlay = () => {
-    stompClient.current.publish({
-      destination: `/app/box/${boxId}/video-sync`,
-      body: JSON.stringify({ action: "play" }),
-    });
-    setPlaying(true);
+  // Envoi action vidéo
+  const sendVideoAction = (action) => {
+    if (stompClient.current && stompClient.current.connected) {
+      stompClient.current.publish({
+        destination: `/app/box/${boxId}/video-sync`,
+        body: JSON.stringify({ action }),
+      });
+    }
+    setPlaying(action === "play");
   };
 
-  const handlePause = () => {
-    stompClient.current.publish({
-      destination: `/app/box/${boxId}/video-sync`,
-      body: JSON.stringify({ action: "pause" }),
-    });
-    setPlaying(false);
-  };
-
-  // === Envoi d'un message chat ===
+  // Envoi message chat
   const sendMessage = () => {
     if (!newMessage.trim()) return;
-
-    stompClient.current.publish({
-      destination: `/app/box/${boxId}/chat`,
-      body: JSON.stringify({ sender: "Moi", content: newMessage }),
-    });
-    setNewMessage("");
-  };
-
-  // === Envoi d'une invitation ===
-  const sendInvite = () => {
-    if (!invitedUser.trim()) return;
-
-    stompClient.current.publish({
-      destination: `/app/box/${boxId}/invite`,
-      body: JSON.stringify({ invitedUsername: invitedUser }),
-    });
-    setInvitedUser("");
+    if (stompClient.current && stompClient.current.connected) {
+      const msg = {
+        sender: "Moi",
+        content: newMessage.trim(),
+      };
+      stompClient.current.publish({
+        destination: `/app/box/${boxId}/chat`,
+        body: JSON.stringify(msg),
+      });
+      setNewMessage("");
+    }
   };
 
   return (
-    <div className="p-4 space-y-6">
-      <h1 className="text-2xl font-bold text-white">🎥 Lecture synchronisée</h1>
+    <div>
+      <h2>🎥 Composant Synchronisation Vidéo</h2>
 
       <ReactPlayer
         ref={playerRef}
-        url="https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4"
-        controls
+        url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrsdui5bgeyf3tkump5r2i3m4jxtdl5cyi3fyab46c37ha3ys4tivm7jm7d5tcgczaya7fi/Angel__x27_s.Last_Mission._Love.S01.E05.720p.WeCima.Show.mp4"
         playing={playing}
-        onPlay={handlePlay}
-        onPause={handlePause}
+        controls={true}
+        onPlay={() => sendVideoAction("play")}
+        onPause={() => sendVideoAction("pause")}
         width="100%"
-        height="auto"
       />
+      {!connected && <p>🕐 Connexion au serveur en cours...</p>}
 
-      {/* === Chat === */}
-      <div className="mt-6 p-4 bg-gray-900 rounded-xl text-white">
-        <h2 className="text-xl font-semibold">💬 Chat</h2>
-        <div className="h-40 overflow-y-auto border border-gray-600 p-2 mb-2 rounded">
-          {messages.map((msg, index) => (
-            <div key={index}>
+      <section style={{ marginTop: 20 }}>
+        <h3>💬 Chat</h3>
+        <div
+          ref={chatContainerRef}
+          style={{
+            height: 200,
+            overflowY: "auto",
+            background: "#222",
+            padding: 10,
+            marginBottom: 10,
+            color: "#eee",
+          }}
+        >
+          {messages.length === 0 && <p>Aucun message</p>}
+          {messages.map((msg, i) => (
+            <div key={i}>
               <strong>{msg.sender}:</strong> {msg.content}
             </div>
           ))}
         </div>
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            className="flex-1 p-2 rounded bg-gray-800 text-white"
-            placeholder="Écris un message..."
-          />
-          <button
-            onClick={sendMessage}
-            className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
-          >
-            Envoyer
-          </button>
-        </div>
-      </div>
+        <input
+          type="text"
+          value={newMessage}
+          placeholder="Écris un message..."
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          style={{ width: "80%", padding: 6, marginRight: 10 }}
+        />
+        <button onClick={sendMessage} style={{ padding: "6px 12px" }}>
+          Envoyer
+        </button>
+      </section>
 
-      {/* === Invitation === */}
-      <div className="mt-6 p-4 bg-gray-900 rounded-xl text-white">
-        <h2 className="text-xl font-semibold">📨 Invitation</h2>
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            value={invitedUser}
-            onChange={(e) => setInvitedUser(e.target.value)}
-            className="flex-1 p-2 rounded bg-gray-800 text-white"
-            placeholder="Nom d'utilisateur à inviter"
-          />
-          <button
-            onClick={sendInvite}
-            className="px-4 py-2 bg-green-600 rounded hover:bg-green-700"
-          >
-            Inviter
-          </button>
+      <section style={{ marginTop: 20 }}>
+        <h3>📨 Invitations</h3>
+        <div
+          ref={invitContainerRef}
+          style={{
+            maxHeight: 150,
+            overflowY: "auto",
+            background: "#222",
+            padding: 10,
+            color: "#eee",
+          }}
+        >
+          {invitations.length === 0 && <p>Aucune invitation</p>}
+          {invitations.map((inv, i) => (
+            <div key={i}>
+              <strong>{inv.invitedUsername}</strong> vous a invité
+            </div>
+          ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
