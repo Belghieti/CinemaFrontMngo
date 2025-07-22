@@ -7,14 +7,15 @@ export default function VideoSyncComponent({ boxId }) {
   const stompClient = useRef(null);
   const chatContainerRef = useRef(null);
   const invitContainerRef = useRef(null);
-  const suppressEvent = useRef(false); // Pour ignorer les événements causés par réception WS
-  const seekTimeout = useRef(null); // Pour debounce du seek
+  const suppressEvent = useRef(false);
+  const seekTimeout = useRef(null);
 
   const [connected, setConnected] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [invitations, setInvitations] = useState([]);
+  const [inviteUsername, setInviteUsername] = useState(""); // 👈 Nouveau champ
 
   useEffect(() => {
     const client = new Client({
@@ -26,19 +27,13 @@ export default function VideoSyncComponent({ boxId }) {
 
         client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
           const videoMessage = JSON.parse(msg.body);
-          console.log("🎬 Action vidéo reçue :", videoMessage);
+          suppressEvent.current = true;
 
-          suppressEvent.current = true; // Bloquer les événements locaux pendant la sync
-
-          if (videoMessage.action === "play") {
-            setPlaying(true);
-          } else if (videoMessage.action === "pause") {
-            setPlaying(false);
-          } else if (videoMessage.action === "seek" && playerRef.current) {
+          if (videoMessage.action === "play") setPlaying(true);
+          else if (videoMessage.action === "pause") setPlaying(false);
+          else if (videoMessage.action === "seek" && playerRef.current)
             playerRef.current.seekTo(videoMessage.time || 0);
-          }
 
-          // Réactiver les événements locaux après un délai (500ms)
           setTimeout(() => {
             suppressEvent.current = false;
           }, 500);
@@ -83,7 +78,7 @@ export default function VideoSyncComponent({ boxId }) {
   };
 
   const handlePlay = () => {
-    if (suppressEvent.current) return; // Ne rien faire si c'est une sync distante
+    if (suppressEvent.current) return;
     sendVideoAction("play");
   };
 
@@ -92,17 +87,15 @@ export default function VideoSyncComponent({ boxId }) {
     sendVideoAction("pause");
   };
 
-  // Debounce : envoie le seek seulement 300ms après le dernier mouvement utilisateur
   const handleSeek = (seconds) => {
     if (suppressEvent.current) return;
-
     if (seekTimeout.current) clearTimeout(seekTimeout.current);
+
     seekTimeout.current = setTimeout(() => {
       sendVideoAction("seek", seconds);
     }, 300);
   };
 
-  // Envoi message chat
   const sendMessage = () => {
     if (!newMessage.trim()) return;
     if (!stompClient.current || !stompClient.current.connected) return;
@@ -118,6 +111,24 @@ export default function VideoSyncComponent({ boxId }) {
     });
 
     setNewMessage("");
+  };
+
+  // ✅ Fonction pour envoyer une invitation
+  const sendInvitation = () => {
+    if (!inviteUsername.trim()) return;
+    if (!stompClient.current || !stompClient.current.connected) return;
+
+    const invitation = {
+      invitedUsername: inviteUsername.trim(),
+      boxId,
+    };
+
+    stompClient.current.publish({
+      destination: `/app/box/${boxId}/invitations`,
+      body: JSON.stringify(invitation),
+    });
+
+    setInviteUsername("");
   };
 
   return (
@@ -171,7 +182,7 @@ export default function VideoSyncComponent({ boxId }) {
       </section>
 
       <section style={{ marginTop: 20 }}>
-        <h3>📨 Invitations</h3>
+        <h3>📨 Invitations reçues</h3>
         <div
           ref={invitContainerRef}
           style={{
@@ -188,6 +199,20 @@ export default function VideoSyncComponent({ boxId }) {
               <strong>{inv.invitedUsername}</strong> vous a invité
             </div>
           ))}
+        </div>
+
+        {/* ✅ Nouveau champ d'envoi */}
+        <div style={{ marginTop: 10 }}>
+          <input
+            type="text"
+            placeholder="Nom d'utilisateur à inviter"
+            value={inviteUsername}
+            onChange={(e) => setInviteUsername(e.target.value)}
+            style={{ width: "60%", padding: 6, marginRight: 10 }}
+          />
+          <button onClick={sendInvitation} style={{ padding: "6px 12px" }}>
+            Inviter
+          </button>
         </div>
       </section>
     </div>
