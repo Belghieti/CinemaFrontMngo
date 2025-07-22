@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { Client } from "@stomp/stompjs";
 import ReactPlayer from "react-player";
@@ -9,6 +7,8 @@ export default function VideoSyncComponent({ boxId }) {
   const stompClient = useRef(null);
   const chatContainerRef = useRef(null);
   const invitContainerRef = useRef(null);
+  const suppressEvent = useRef(false); // Pour ignorer les événements causés par réception WS
+  const seekTimeout = useRef(null); // Pour debounce du seek
 
   const [connected, setConnected] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -16,7 +16,6 @@ export default function VideoSyncComponent({ boxId }) {
   const [newMessage, setNewMessage] = useState("");
   const [invitations, setInvitations] = useState([]);
 
-  // Connexion WebSocket + abonnements
   useEffect(() => {
     const client = new Client({
       brokerURL: `wss://cinemamongo-production.up.railway.app/ws`,
@@ -25,10 +24,11 @@ export default function VideoSyncComponent({ boxId }) {
         console.log("✅ Connecté au serveur WebSocket");
         setConnected(true);
 
-        // Synchro vidéo
         client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
           const videoMessage = JSON.parse(msg.body);
           console.log("🎬 Action vidéo reçue :", videoMessage);
+
+          suppressEvent.current = true; // Bloquer les événements locaux pendant la sync
 
           if (videoMessage.action === "play") {
             setPlaying(true);
@@ -37,15 +37,18 @@ export default function VideoSyncComponent({ boxId }) {
           } else if (videoMessage.action === "seek" && playerRef.current) {
             playerRef.current.seekTo(videoMessage.time || 0);
           }
+
+          // Réactiver les événements locaux après un délai (500ms)
+          setTimeout(() => {
+            suppressEvent.current = false;
+          }, 500);
         });
 
-        // Chat
         client.subscribe(`/topic/box/${boxId}/chat`, (msg) => {
           const chatMsg = JSON.parse(msg.body);
           setMessages((prev) => [...prev, chatMsg]);
         });
 
-        // Invitations
         client.subscribe(`/topic/box/${boxId}/invitations`, (msg) => {
           const invMsg = JSON.parse(msg.body);
           setInvitations((prev) => [...prev, invMsg]);
@@ -64,39 +67,57 @@ export default function VideoSyncComponent({ boxId }) {
     };
   }, [boxId]);
 
-  // Envoi action vidéo (play, pause, seek)
   const sendVideoAction = (action, time = null) => {
-    if (stompClient.current && stompClient.current.connected) {
-      const payload = { action };
-      if (time !== null) payload.time = time;
-      stompClient.current.publish({
-        destination: `/app/box/${boxId}/video-sync`,
-        body: JSON.stringify(payload),
-      });
-    }
+    if (!stompClient.current || !stompClient.current.connected) return;
+
+    const payload = { action };
+    if (time !== null) payload.time = time;
+
+    stompClient.current.publish({
+      destination: `/app/box/${boxId}/video-sync`,
+      body: JSON.stringify(payload),
+    });
+
     if (action === "play") setPlaying(true);
     else if (action === "pause") setPlaying(false);
   };
 
-  // Gestion des événements ReactPlayer
+  const handlePlay = () => {
+    if (suppressEvent.current) return; // Ne rien faire si c'est une sync distante
+    sendVideoAction("play");
+  };
+
+  const handlePause = () => {
+    if (suppressEvent.current) return;
+    sendVideoAction("pause");
+  };
+
+  // Debounce : envoie le seek seulement 300ms après le dernier mouvement utilisateur
   const handleSeek = (seconds) => {
-    sendVideoAction("seek", seconds);
+    if (suppressEvent.current) return;
+
+    if (seekTimeout.current) clearTimeout(seekTimeout.current);
+    seekTimeout.current = setTimeout(() => {
+      sendVideoAction("seek", seconds);
+    }, 300);
   };
 
   // Envoi message chat
   const sendMessage = () => {
     if (!newMessage.trim()) return;
-    if (stompClient.current && stompClient.current.connected) {
-      const msg = {
-        sender: "Moi",
-        content: newMessage.trim(),
-      };
-      stompClient.current.publish({
-        destination: `/app/box/${boxId}/chat`,
-        body: JSON.stringify(msg),
-      });
-      setNewMessage("");
-    }
+    if (!stompClient.current || !stompClient.current.connected) return;
+
+    const msg = {
+      sender: "Moi",
+      content: newMessage.trim(),
+    };
+
+    stompClient.current.publish({
+      destination: `/app/box/${boxId}/chat`,
+      body: JSON.stringify(msg),
+    });
+
+    setNewMessage("");
   };
 
   return (
@@ -108,11 +129,12 @@ export default function VideoSyncComponent({ boxId }) {
         url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrsdui5bgeyf3tkump5r2i3m4jxtdl5cyi3fyab46c37ha3ys4tivm7jm7d5tcgczaya7fi/Angel__x27_s.Last_Mission._Love.S01.E05.720p.WeCima.Show.mp4"
         playing={playing}
         controls={true}
-        onPlay={() => sendVideoAction("play")}
-        onPause={() => sendVideoAction("pause")}
+        onPlay={handlePlay}
+        onPause={handlePause}
         onSeek={handleSeek}
         width="100%"
       />
+
       {!connected && <p>🕐 Connexion au serveur en cours...</p>}
 
       <section style={{ marginTop: 20 }}>
