@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import * as SockJS from "sockjs-client";
+import React, { useEffect, useRef, useState } from "react";
 import { Client } from "@stomp/stompjs";
 import ReactPlayer from "react-player";
 
 export default function VideoSyncComponent({ boxId }) {
   const playerRef = useRef(null);
   const stompClient = useRef(null);
+  const chatContainerRef = useRef(null);
+  const suppressEvent = useRef(false);
+
   const [connected, setConnected] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -16,10 +18,8 @@ export default function VideoSyncComponent({ boxId }) {
   const [userId, setUserId] = useState(null);
   const [boxInfo, setBoxInfo] = useState(null);
   const [error, setError] = useState(null);
-  const chatContainerRef = useRef(null);
-  const suppressEvent = useRef(false);
 
-  // 🔹 1. Charger les infos utilisateur + box
+  // 1. Charger les infos utilisateur + box
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -55,23 +55,22 @@ export default function VideoSyncComponent({ boxId }) {
       });
   }, [boxId]);
 
-  // 🔹 2. Connexion WebSocket + synchronisation initiale
+  // 2. Connexion WebSocket + synchronisation initiale
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!boxInfo?.id || !token) return;
 
     const client = new Client({
-      //webSocketFactory: () =>
-       // new SockJS("https://cinemamongo-production.up.railway.app/ws-sockjs"),
-        brokerURL: "wss://cinemamongo-production.up.railway.app/ws", // WebSocket natif
-
-        //connectHeaders: { Authorization: `Bearer ${token}` },
-     // reconnectDelay: 5000,
+      brokerURL: "wss://cinemamongo-production.up.railway.app/ws", // WebSocket natif
+      // Pour activer l'authentification via header :
+      // connectHeaders: { Authorization: `Bearer ${token}` },
+      reconnectDelay: 5000,
+      debug: (str) => console.log(str),
       onConnect: () => {
         console.log("✅ WebSocket connecté");
         setConnected(true);
 
-        // 🔄 Abonnement à la synchronisation vidéo
+        // Abonnement à la synchronisation vidéo
         client.subscribe(`/topic/box/${boxInfo.id}/video-sync`, (msg) => {
           const data = JSON.parse(msg.body);
           if (!playerRef.current) return;
@@ -93,13 +92,13 @@ export default function VideoSyncComponent({ boxId }) {
           }, 500);
         });
 
-        // 🔄 Abonnement aux messages chat
+        // Abonnement au chat
         client.subscribe(`/topic/box/${boxInfo.id}/chat`, (msg) => {
           const data = JSON.parse(msg.body);
           setMessages((prev) => [...prev, data]);
         });
 
-        // 🔄 Demander état de synchronisation aux autres clients
+        // Demander état de synchronisation aux autres clients
         client.publish({
           destination: `/app/box/${boxInfo.id}/video-sync`,
           body: JSON.stringify({ action: "sync_request", sender: userId }),
@@ -120,9 +119,9 @@ export default function VideoSyncComponent({ boxId }) {
     return () => {
       client.deactivate();
     };
-  }, [boxInfo]);
+  }, [boxInfo, userId]);
 
-  // 🔹 3. Envoi d'action vidéo
+  // 3. Envoi d'action vidéo (play/pause/seek)
   const sendAction = (action) => {
     if (!stompClient.current?.connected || !playerRef.current) return;
     const time = playerRef.current.getCurrentTime() || 0;
@@ -133,7 +132,7 @@ export default function VideoSyncComponent({ boxId }) {
     });
   };
 
-  // 🔹 4. Réactions aux événements locaux
+  // 4. Gestion événements vidéo locaux
   const handlePlay = () => {
     if (!suppressEvent.current) sendAction("play");
     setPlaying(true);
@@ -148,7 +147,7 @@ export default function VideoSyncComponent({ boxId }) {
     if (!suppressEvent.current) sendAction("seek");
   };
 
-  // 🔹 5. Envoi de message chat
+  // 5. Envoi message chat
   const sendMessage = () => {
     if (!newMessage.trim()) return;
     const msg = {
@@ -164,7 +163,7 @@ export default function VideoSyncComponent({ boxId }) {
     setNewMessage("");
   };
 
-  // 🔹 6. Scroll automatique du chat
+  // 6. Scroll auto chat
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop =

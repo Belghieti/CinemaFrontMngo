@@ -17,7 +17,8 @@
     "react-icons": "^5.5.0",
     "react-player": "^2.16.0",
     "sockjs-client": "^1.6.1",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "websocket": "^1.0.35"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
