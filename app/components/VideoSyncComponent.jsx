@@ -62,7 +62,7 @@ export default function VideoSyncComponent({ boxId }) {
 
     const client = new Client({
       webSocketFactory: () =>
-        new SockJS("https://cinemamongo-production.up.railway.app/ws"),
+        new SockJS("https://cinemamongo-production.up.railway.app/ws-sockjs"),
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
       onConnect: () => {
