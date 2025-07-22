@@ -67,7 +67,7 @@ export default function VideoSyncComponent({ boxId }) {
       <h2>🎥 Composant Synchronisation Vidéo</h2>
       <ReactPlayer
         ref={playerRef}
-        url="https://www.w3schools.com/html/mov_bbb.mp4"
+        url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrsdui5bgeyf3tkump5r2i3m4jxtdl5cyi3fyab46c37ha3ys4tivm7jm7d5tcgczaya7fi/Angel__x27_s.Last_Mission._Love.S01.E05.720p.WeCima.Show.mp4"
         playing={playing}
         controls={true}
         onPlay={handlePlay}
