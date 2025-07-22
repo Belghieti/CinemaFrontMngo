@@ -1,115 +1,36 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Client } from "@stomp/stompjs";
 import ReactPlayer from "react-player";
 
 export default function VideoSyncComponent({ boxId }) {
   const playerRef = useRef(null);
   const stompClient = useRef(null);
-  const chatContainerRef = useRef(null);
-  const suppressEvent = useRef(false);
-
   const [connected, setConnected] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [username, setUsername] = useState("Moi");
-  const [userId, setUserId] = useState(null);
-  const [boxInfo, setBoxInfo] = useState(null);
-  const [error, setError] = useState(null);
 
-  // 1. Charger les infos utilisateur + box
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setError("Token non trouvé");
-      return;
-    }
-
-    fetch("https://cinemamongo-production.up.railway.app/auth/getUserInfo", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((user) => {
-        setUsername(user.username);
-        setUserId(user.id);
-
-        return fetch(
-          `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}?userId=${user.id}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      })
-      .then((res) => {
-        if (!res.ok) throw new Error("Accès refusé à la box");
-        return res.json();
-      })
-      .then((data) => {
-        setBoxInfo(data);
-      })
-      .catch((err) => {
-        console.error("Erreur:", err);
-        setError("Erreur: " + err.message);
-      });
-  }, [boxId]);
-
-  // 2. Connexion WebSocket + synchronisation initiale
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!boxInfo?.id || !token) return;
-
     const client = new Client({
-      brokerURL: "wss://cinemamongo-production.up.railway.app/ws", // WebSocket natif
-      // Pour activer l'authentification via header :
-      // connectHeaders: { Authorization: `Bearer ${token}` },
+      brokerURL: `wss://cinemamongo-production.up.railway.app/ws`,
       reconnectDelay: 5000,
-      debug: (str) => console.log(str),
       onConnect: () => {
-        console.log("✅ WebSocket connecté");
+        console.log("✅ Connecté au serveur WebSocket (vidéo)");
         setConnected(true);
 
-        // Abonnement à la synchronisation vidéo
-        client.subscribe(`/topic/box/${boxInfo.id}/video-sync`, (msg) => {
-          const data = JSON.parse(msg.body);
-          if (!playerRef.current) return;
+        client.subscribe(`/topic/box/${boxId}/video-sync`, (message) => {
+          const videoMessage = JSON.parse(message.body);
+          console.log("🎬 Action vidéo reçue :", videoMessage);
 
-          suppressEvent.current = true;
-
-          if (data.action === "play") {
-            playerRef.current.seekTo(data.time || 0, "seconds");
-            setTimeout(() => setPlaying(true), 300);
-          } else if (data.action === "pause") {
-            playerRef.current.seekTo(data.time || 0, "seconds");
-            setTimeout(() => setPlaying(false), 300);
-          } else if (data.action === "seek") {
-            playerRef.current.seekTo(data.time || 0, "seconds");
+          if (videoMessage.action === "play") {
+            setPlaying(true);
+          } else if (videoMessage.action === "pause") {
+            setPlaying(false);
           }
-
-          setTimeout(() => {
-            suppressEvent.current = false;
-          }, 500);
         });
-
-        // Abonnement au chat
-        client.subscribe(`/topic/box/${boxInfo.id}/chat`, (msg) => {
-          const data = JSON.parse(msg.body);
-          setMessages((prev) => [...prev, data]);
-        });
-
-        // Demander état de synchronisation aux autres clients
-        client.publish({
-          destination: `/app/box/${boxInfo.id}/video-sync`,
-          body: JSON.stringify({ action: "sync_request", sender: userId }),
-        });
-      },
-      onDisconnect: () => {
-        console.warn("❌ WebSocket déconnecté");
-        setConnected(false);
       },
       onStompError: (frame) => {
-        console.error("🚨 STOMP Error:", frame.body);
+        console.error("❌ Erreur STOMP :", frame.headers["message"]);
       },
     });
 
@@ -119,129 +40,41 @@ export default function VideoSyncComponent({ boxId }) {
     return () => {
       client.deactivate();
     };
-  }, [boxInfo, userId]);
+  }, [boxId]);
 
-  // 3. Envoi d'action vidéo (play/pause/seek)
-  const sendAction = (action) => {
-    if (!stompClient.current?.connected || !playerRef.current) return;
-    const time = playerRef.current.getCurrentTime() || 0;
-
-    stompClient.current.publish({
-      destination: `/app/box/${boxInfo.id}/video-sync`,
-      body: JSON.stringify({ action, time }),
-    });
-  };
-
-  // 4. Gestion événements vidéo locaux
   const handlePlay = () => {
-    if (!suppressEvent.current) sendAction("play");
+    if (stompClient.current && stompClient.current.connected) {
+      stompClient.current.publish({
+        destination: `/app/box/${boxId}/video-sync`,
+        body: JSON.stringify({ action: "play" }),
+      });
+    }
     setPlaying(true);
   };
 
   const handlePause = () => {
-    if (!suppressEvent.current) sendAction("pause");
+    if (stompClient.current && stompClient.current.connected) {
+      stompClient.current.publish({
+        destination: `/app/box/${boxId}/video-sync`,
+        body: JSON.stringify({ action: "pause" }),
+      });
+    }
     setPlaying(false);
   };
 
-  const handleSeek = () => {
-    if (!suppressEvent.current) sendAction("seek");
-  };
-
-  // 5. Envoi message chat
-  const sendMessage = () => {
-    if (!newMessage.trim()) return;
-    const msg = {
-      sender: username,
-      content: newMessage.trim(),
-    };
-
-    stompClient.current?.publish({
-      destination: `/app/box/${boxInfo.id}/chat`,
-      body: JSON.stringify(msg),
-    });
-
-    setNewMessage("");
-  };
-
-  // 6. Scroll auto chat
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop =
-        chatContainerRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  if (error) {
-    return (
-      <div className="text-red-400 text-center p-6">
-        <p>{error}</p>
-      </div>
-    );
-  }
-
-  if (!boxInfo) {
-    return (
-      <div className="text-white text-center p-6">Chargement de la box...</div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-black text-white p-6 flex flex-col items-center">
-      <div className="w-full max-w-6xl space-y-6">
-        <h1 className="text-3xl font-bold">{boxInfo.name}</h1>
-
-        {boxInfo.movie?.videoUrl ? (
-          <ReactPlayer
-            ref={playerRef}
-            url={boxInfo.movie.videoUrl}
-            playing={playing}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onSeek={handleSeek}
-            controls
-            width="100%"
-            height="500px"
-          />
-        ) : (
-          <p className="text-yellow-400">
-            ⚠️ Pas de vidéo disponible pour cette box.
-          </p>
-        )}
-
-        <div className="bg-gray-800 p-4 rounded-lg space-y-4">
-          <div
-            ref={chatContainerRef}
-            className="h-64 overflow-y-auto bg-gray-900 rounded p-3 space-y-2"
-          >
-            {messages.length === 0 ? (
-              <p className="text-gray-400 italic">Aucun message</p>
-            ) : (
-              messages.map((msg, i) => (
-                <div key={i} className="text-sm">
-                  <strong>{msg.sender}:</strong> {msg.content}
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              className="flex-1 bg-gray-700 text-white px-4 py-2 rounded"
-              placeholder="Écris un message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-            />
-            <button
-              onClick={sendMessage}
-              className="bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded text-white"
-            >
-              Envoyer
-            </button>
-          </div>
-        </div>
-      </div>
+    <div>
+      <h2>🎥 Composant Synchronisation Vidéo</h2>
+      <ReactPlayer
+        ref={playerRef}
+        url="https://www.w3schools.com/html/mov_bbb.mp4"
+        playing={playing}
+        controls={true}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        width="100%"
+      />
+      {!connected && <p>🕐 Connexion au serveur en cours...</p>}
     </div>
   );
 }
