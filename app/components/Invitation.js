@@ -8,6 +8,8 @@ export default function InvitationsPage() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const [token, setToken] = useState("");
   const [invitations, setInvitations] = useState([]);
+  const [inviteUsername, setInviteUsername] = useState(""); // 🔥 nouveau champ
+  const [stompClient, setStompClient] = useState(null); // 🔥 pour envoyer
   const router = useRouter();
 
   useEffect(() => {
@@ -16,7 +18,7 @@ export default function InvitationsPage() {
 
     setToken(storedToken);
 
-    // Chargement initial des invitations via REST
+    // 🔄 Chargement initial des invitations REST
     fetch(`${baseUrl}/api/invitations/received`, {
       headers: {
         Authorization: `Bearer ${storedToken}`,
@@ -33,13 +35,9 @@ export default function InvitationsPage() {
         console.error("Erreur lors du chargement des invitations :", err)
       );
 
-    // Connexion WebSocket via STOMP.js avec token en header
+    // 🔌 Connexion WebSocket STOMP
     const client = new Client({
       brokerURL: `wss://cinemamongo-production.up.railway.app/ws`,
-      //connectHeaders: {
-        //Authorization: `Bearer ${storedToken}`,
-      //},
-      //reconnectDelay: 5000,
       onConnect: () => {
         client.subscribe("/topic/invitations", (message) => {
           const data = JSON.parse(message.body);
@@ -54,11 +52,29 @@ export default function InvitationsPage() {
     });
 
     client.activate();
+    setStompClient(client); // 🔥 pour envoyer ensuite
 
     return () => {
       client.deactivate();
     };
   }, [baseUrl]);
+
+  // ✅ Envoyer une invitation
+  const handleSendInvitation = () => {
+    if (!inviteUsername.trim() || !stompClient?.connected) return;
+
+    const payload = {
+      invitedUsername: inviteUsername.trim(),
+      boxId: "123", // à remplacer dynamiquement si nécessaire
+    };
+
+    stompClient.publish({
+      destination: `/app/box/${payload.boxId}/invitations`,
+      body: JSON.stringify(payload),
+    });
+
+    setInviteUsername(""); // reset champ
+  };
 
   const handleAccept = async (invitationId) => {
     try {
@@ -82,7 +98,6 @@ export default function InvitationsPage() {
           alert("Box introuvable pour cette invitation.");
         }
 
-        // Supprimer l'invitation acceptée de la liste
         setInvitations((prev) => prev.filter((inv) => inv.id !== invitationId));
       } else {
         alert("Erreur lors de l'acceptation");
@@ -98,10 +113,30 @@ export default function InvitationsPage() {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Mes invitations</h1>
+
+      {/* 🔽 Section Envoi d'invitation */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-2">Inviter un ami</h2>
+        <input
+          type="text"
+          placeholder="Nom d'utilisateur"
+          value={inviteUsername}
+          onChange={(e) => setInviteUsername(e.target.value)}
+          className="border p-2 rounded mr-2"
+        />
+        <button
+          onClick={handleSendInvitation}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Envoyer invitation
+        </button>
+      </div>
+
+      {/* 🔽 Liste des invitations */}
       {invitations.length === 0 ? (
         <p>Aucune invitation en attente.</p>
       ) : (
-        <ul className="overflow-y-auto max-h-96">
+        <ul className="overflow-y-auto max-h-96 space-y-4">
           {invitations.map((invitation) => (
             <li key={invitation.id} className="border p-4 rounded shadow">
               <p>
