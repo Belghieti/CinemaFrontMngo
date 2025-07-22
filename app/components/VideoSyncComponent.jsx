@@ -29,8 +29,14 @@ export default function VideoSyncComponent({ boxId }) {
         client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
           const videoMessage = JSON.parse(msg.body);
           console.log("🎬 Action vidéo reçue :", videoMessage);
-          if (videoMessage.action === "play") setPlaying(true);
-          else if (videoMessage.action === "pause") setPlaying(false);
+
+          if (videoMessage.action === "play") {
+            setPlaying(true);
+          } else if (videoMessage.action === "pause") {
+            setPlaying(false);
+          } else if (videoMessage.action === "seek" && playerRef.current) {
+            playerRef.current.seekTo(videoMessage.time || 0);
+          }
         });
 
         // Chat
@@ -58,15 +64,23 @@ export default function VideoSyncComponent({ boxId }) {
     };
   }, [boxId]);
 
-  // Envoi action vidéo
-  const sendVideoAction = (action) => {
+  // Envoi action vidéo (play, pause, seek)
+  const sendVideoAction = (action, time = null) => {
     if (stompClient.current && stompClient.current.connected) {
+      const payload = { action };
+      if (time !== null) payload.time = time;
       stompClient.current.publish({
         destination: `/app/box/${boxId}/video-sync`,
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(payload),
       });
     }
-    setPlaying(action === "play");
+    if (action === "play") setPlaying(true);
+    else if (action === "pause") setPlaying(false);
+  };
+
+  // Gestion des événements ReactPlayer
+  const handleSeek = (seconds) => {
+    sendVideoAction("seek", seconds);
   };
 
   // Envoi message chat
@@ -96,6 +110,7 @@ export default function VideoSyncComponent({ boxId }) {
         controls={true}
         onPlay={() => sendVideoAction("play")}
         onPause={() => sendVideoAction("pause")}
+        onSeek={handleSeek}
         width="100%"
       />
       {!connected && <p>🕐 Connexion au serveur en cours...</p>}
