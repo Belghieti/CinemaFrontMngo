@@ -25,7 +25,7 @@ export default function AddBoxForm() {
 
     const fetchMovies = async () => {
       try {
-        const res = await fetch(`${baseUrl}/api/movies`, {
+        const res = await fetch(`${baseUrl}/api/movies/user`, {
           headers: {
             Authorization: `Bearer ${storedToken}`,
           },
