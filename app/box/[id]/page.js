@@ -26,18 +26,16 @@ export default function BoxPage() {
 
     setToken(storedToken);
 
+    // Get user info
     fetch(`${baseUrl}/auth/getUserInfo`, {
-      headers: {
-        Authorization: `Bearer ${storedToken}`,
-      },
+      headers: { Authorization: `Bearer ${storedToken}` },
     })
       .then((res) => res.json())
       .then(setUserInfo);
 
+    // Get box data
     fetch(`${baseUrl}/api/boxes/${id}`, {
-      headers: {
-        Authorization: `Bearer ${storedToken}`,
-      },
+      headers: { Authorization: `Bearer ${storedToken}` },
     })
       .then((res) => {
         if (!res.ok) throw new Error("Box non trouvée");
@@ -46,17 +44,21 @@ export default function BoxPage() {
       .then(setBox)
       .catch(() => router.push("/"));
 
+    // Get all users
     fetch(`${baseUrl}/auth/getAllUsers`, {
-      headers: {
-        Authorization: `Bearer ${storedToken}`,
-      },
+      headers: { Authorization: `Bearer ${storedToken}` },
     })
       .then((res) => res.json())
       .then(setUsers);
   }, [id, router]);
 
   const handleInvite = async (userId) => {
-    const senderId = box.host.id;
+    const senderId = box?.hostId;
+
+    if (!senderId) {
+      alert("Erreur : hostId est manquant.");
+      return;
+    }
 
     const res = await fetch(`${baseUrl}/api/invitations/send`, {
       method: "POST",
@@ -78,15 +80,16 @@ export default function BoxPage() {
     }
   };
 
-  const filteredUsers = users.filter((user) =>
-    user.username.toLowerCase().includes(search.toLowerCase())
-  );
-
   const handleLogout = () => {
-    // Supprimer le token de session et rediriger vers la page d'accueil
     localStorage.removeItem("token");
     router.push("/");
   };
+
+  const filteredUsers = users
+    .filter((user) => user.id !== userInfo?.id)
+    .filter((user) =>
+      user.username.toLowerCase().includes(search.toLowerCase())
+    );
 
   if (!box || !userInfo) {
     return (
@@ -113,10 +116,9 @@ export default function BoxPage() {
           <div className="w-14 h-14 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg ring-4 ring-offset-2 ring-blue-200">
             {userInfo.username?.charAt(0).toUpperCase()}
           </div>
-          {/* Button de déconnexion */}
           <button
             onClick={handleLogout}
-            className="px-1 py-1 bg-bleu-400 text-white rounded-xl hover:bg-red-600 transition duration-200 ease-in-out"
+            className="px-3 py-2 bg-blue-400 text-white rounded-xl hover:bg-red-600 transition duration-200 ease-in-out"
           >
             Déconnexion
           </button>
@@ -129,14 +131,13 @@ export default function BoxPage() {
           🎥 Room: {box.name}
         </h2>
 
-        {/* Contenu principal en 2 colonnes */}
         <div className="flex flex-col md:flex-row gap-8">
-          {/* Composant vidéo */}
+          {/* Video component */}
           <div className="flex-1 bg-white/5 p-6 rounded-2xl shadow-lg">
-            <VideoSyncComponent boxId={id}  />
+            <VideoSyncComponent boxId={id} />
           </div>
 
-          {/* Bloc invitation */}
+          {/* Invitation block */}
           <div className="w-full md:w-1/3 bg-white/5 p-6 max-h-[400px] rounded-2xl shadow-lg">
             <h3 className="text-xl font-semibold text-blue-500 mb-4">
               👥 Inviter un ami
@@ -148,14 +149,12 @@ export default function BoxPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="mb-6 w-full p-3 rounded-lg bg-slate-700 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500"
             />
-            {/* Bloc des invitations avec scroll */}
             <div className="flex flex-col gap-4 max-h-[200px] overflow-y-auto">
               {filteredUsers.map((user) => (
                 <div
                   key={user.id}
                   className="flex items-center justify-between bg-slate-800 p-4 rounded-lg border border-white/20"
                 >
-                  {/* Cercle de statut de connexion */}
                   <div
                     className={`w-4 h-4 rounded-full ${
                       user.isConnected ? "bg-green-500" : "bg-red-500"
