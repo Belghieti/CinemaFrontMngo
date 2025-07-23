@@ -90,6 +90,14 @@ export default function BoxPage() {
 
       if (res.ok) {
         alert("Invitation envoyée !");
+        // Rafraîchir la liste des utilisateurs après invitation
+        const usersRes = await fetch(`${baseUrl}/auth/getAllUsers`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (usersRes.ok) {
+          const usersData = await usersRes.json();
+          setUsers(usersData);
+        }
       } else {
         alert("Erreur lors de l'envoi de l'invitation");
       }
@@ -103,8 +111,15 @@ export default function BoxPage() {
     router.push("/");
   };
 
+  // Filtrage sécurisé des utilisateurs
   const filteredUsers = users
-    .filter((user) => user.id !== userInfo?.id)
+    .filter(
+      (user) =>
+        user &&
+        typeof user.username === "string" &&
+        user.username.length > 0 &&
+        user.id !== userInfo?.id
+    )
     .filter((user) =>
       user.username.toLowerCase().includes(search.toLowerCase())
     );
@@ -145,18 +160,18 @@ export default function BoxPage() {
 
       {/* MAIN CONTENT */}
       <main className="w-full flex-1 p-8 flex flex-col gap-8">
-        {/* Affichage du nom de la box */}
+        {/* Nom de la box */}
         <h2 className="text-4xl font-bold text-center text-blue-500">
           🎥 Room: {box.box.name}
         </h2>
 
         <div className="flex flex-col md:flex-row gap-8">
-          {/* Video component */}
+          {/* Composant vidéo */}
           <div className="flex-1 bg-white/5 p-6 rounded-2xl shadow-lg">
             <VideoSyncComponent boxId={id} />
           </div>
 
-          {/* Invitation block */}
+          {/* Bloc invitations */}
           <div className="w-full md:w-1/3 bg-white/5 p-6 max-h-[400px] rounded-2xl shadow-lg">
             <h3 className="text-xl font-semibold text-blue-500 mb-4">
               👥 Inviter un ami
@@ -181,7 +196,7 @@ export default function BoxPage() {
                       }`}
                     />
                     <span className="text-white font-medium">
-                      {user.username}
+                      {user.username || "Utilisateur inconnu"}
                     </span>
                     <button
                       onClick={() => handleInvite(user.id)}
