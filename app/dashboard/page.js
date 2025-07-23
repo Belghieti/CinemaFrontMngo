@@ -147,7 +147,7 @@ export default function Dashboard() {
                   onClick={() => joinBox(boxId)}
                   className="w-full px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition duration-200 ease-in-out transform hover:scale-105"
                 >
-                  Rejoindre
+                  Rejoindre la box
                 </button>
 
                 <div>
