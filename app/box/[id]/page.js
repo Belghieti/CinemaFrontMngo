@@ -156,48 +156,7 @@ export default function BoxPage() {
             <VideoSyncComponent boxId={id} />
           </div>
 
-          {/* Invitation block */}
-          <div className="w-full md:w-1/3 bg-white/5 p-6 max-h-[400px] rounded-2xl shadow-lg">
-            <h3 className="text-xl font-semibold text-blue-500 mb-4">
-              👥 Inviter un ami
-            </h3>
-            <input
-              type="text"
-              placeholder="Rechercher un utilisateur..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="mb-6 w-full p-3 rounded-lg bg-slate-700 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex flex-col gap-4 max-h-[200px] overflow-y-auto">
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between bg-slate-800 p-4 rounded-lg border border-white/20"
-                  >
-                    <div
-                      className={`w-4 h-4 rounded-full ${
-                        user.isConnected ? "bg-green-500" : "bg-red-500"
-                      }`}
-                    />
-                    <span className="text-white font-medium">
-                      {user.username}
-                    </span>
-                    <button
-                      onClick={() => handleInvite(user.id)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-200"
-                    >
-                      Inviter
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-400">
-                  Aucun utilisateur trouvé
-                </p>
-              )}
-            </div>
-          </div>
+        
         </div>
       </main>
 
