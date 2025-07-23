@@ -143,14 +143,8 @@ export default function Dashboard() {
                   value={boxId || ""}
                   onChange={(e) => setBoxId(e.target.value)}
                 />
-                <button
-                  onClick={() => joinBox(boxId)}
-                  className="w-full px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition duration-200 ease-in-out transform hover:scale-105"
-                >
-                  Rejoindre la box
-                </button>
 
-                <div>
+                <div className="w-full px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition duration-200 ease-in-out transform hover:scale-105">
                   <JoinRoomComponent />
                 </div>
               </div>
