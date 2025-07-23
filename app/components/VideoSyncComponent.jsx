@@ -134,7 +134,8 @@ export default function VideoSyncComponent({ boxId }) {
       {boxInfo.movie?.videoUrl ? (
         <ReactPlayer
           ref={playerRef}
-          url={boxInfo.movie.videoUrl} // ✅ Lien vidéo dynamique ici !
+         // url={boxInfo.movie.videoUrl} // ✅ Lien vidéo dynamique ici !
+         url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrsdui5bgeyf3tkump5r2i3m4jxtdl5cyi3fyab46crgqzjagojbocagebkvldd727tvcg6/Angel__x27_s.Last_Mission._Love.S01.E05.720p.WeCima.Show.mp4"
           playing={playing}
           controls
           onPlay={handlePlay}
