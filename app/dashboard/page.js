@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import VideoSyncComponent from "../components/VideoSyncComponent";
 import CreateBoxForm from "../components/CreateBoxForm";
 import AddMovieForm from "../components/AddMovieForm";
-
+import JoinRoomComponent from "../components/JoinRoomComponent";
 export default function Dashboard() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const [userInfo, setUserInfo] = useState(null);
