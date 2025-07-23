@@ -32,7 +32,7 @@ export default function BoxPage() {
     })
       .then((res) => res.json())
       .then(setUserInfo);
-
+    console.log("User info:", userInfo);
     // Get box data
     fetch(`${baseUrl}/api/boxes/${id}`, {
       headers: { Authorization: `Bearer ${storedToken}` },
@@ -53,7 +53,11 @@ export default function BoxPage() {
   }, [id, router]);
 
   const handleInvite = async (userId) => {
-    const senderId = box?.hostId;
+     if (!box || !box.hostId) {
+       alert("Erreur : les données de la box ne sont pas encore chargées.");
+       return;
+     }
+    const senderId = box.box.hostId
 
     if (!senderId) {
       alert("Erreur : hostId est manquant.");
@@ -128,7 +132,7 @@ export default function BoxPage() {
       {/* MAIN CONTENT */}
       <main className="w-full flex-1 p-8 flex flex-col gap-8">
         <h2 className="text-4xl font-bold text-center text-blue-500">
-          🎥 Room: {box.name}
+          🎥 Room: {box.box.username}
         </h2>
 
         <div className="flex flex-col md:flex-row gap-8">
