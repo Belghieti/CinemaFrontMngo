@@ -6,56 +6,18 @@ import VideoSyncComponent from "../components/VideoSyncComponent";
 import CreateBoxForm from "../components/CreateBoxForm";
 import AddMovieForm from "../components/AddMovieForm";
 import JoinRoomComponent from "../components/JoinRoomComponent";
+
 export default function Dashboard() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const [userInfo, setUserInfo] = useState(null);
-  const [boxId, setBoxId] = useState(null); // État pour stocker l'ID de la box
   const router = useRouter();
 
-  const handleMovieAdded = (newMovie) => {
-    console.log("Film ajouté :", newMovie);
-  };
-
-  const joinBox = async (boxId) => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/");
-      return;
-    }
-
-    try {
-      const userId = userInfo.id; // ID de l'utilisateur (assumé comme étant déjà récupéré)
-
-      const response = await fetch(
-        `${baseUrl}/api/boxes/${boxId}/join?userId=${userId}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: "Bearer " + token,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.status === "success") {
-        // Rediriger vers la page de la box
-        router.push(`/box/${data.boxId}?token=${token}`);
-      } else {
-        alert(data.message || "Accès refusé");
-      }
-    } catch (error) {
-      console.error("Erreur lors de la tentative de rejoindre la box :", error);
-    }
-  };
-
   const handleLogout = () => {
-    // Supprimer le token de session et rediriger vers la page d'accueil
     localStorage.removeItem("token");
     router.push("/");
   };
 
-  useEffect(() => {
+  const fetchUserInfo = () => {
     const token = localStorage.getItem("token");
     if (!token) {
       router.push("/");
@@ -63,43 +25,44 @@ export default function Dashboard() {
     }
 
     fetch(`${baseUrl}/auth/getUserInfo`, {
-      headers: {
-        Authorization: "Bearer " + token,
-      },
+      headers: { Authorization: "Bearer " + token },
     })
       .then((res) => {
-        if (!res.ok) throw new Error("Non autorisé");
+        if (!res.ok) throw new Error("Unauthorized");
         return res.json();
       })
-      .then((data) => setUserInfo(data))
+      .then(setUserInfo)
       .catch((err) => {
         console.error(err);
         router.push("/");
       });
+  };
+
+  useEffect(() => {
+    fetchUserInfo();
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-900 text-white flex flex-col font-sans">
+    <div className="min-h-screen bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-900 text-white font-sans flex flex-col">
       {/* HEADER */}
-      <header className="w-full flex justify-between items-center p-6 border-b border-white/10 backdrop-blur bg-white/5 shadow-md">
-        <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-blue-600 text-transparent bg-clip-text">
-          🎬 CinéSync – Regardez des films ensemble, même à distance !{" "}
+      <header className="w-full flex justify-between items-center p-6 border-b border-white/10 bg-white/5 backdrop-blur shadow-md">
+        <h1 className="text-xl sm:text-3xl font-extrabold bg-gradient-to-r from-pink-400 to-blue-500 text-transparent bg-clip-text">
+          🎬 CinéSync – Cinéma partagé, à distance !
         </h1>
         {userInfo && (
           <div className="flex items-center gap-4">
-            <div className="flex flex-col text-right">
-              <span className="text-sm font-medium text-gray-200">
+            <div className="text-right">
+              <p className="font-semibold text-sm text-white">
                 {userInfo.username}
-              </span>
-              <span className="text-xs text-gray-400">ID: {userInfo.id}</span>
+              </p>
+              <p className="text-xs text-gray-400">ID: {userInfo.id}</p>
             </div>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-500 flex items-center justify-center text-lg font-bold shadow-md ring-2 ring-blue-300">
+            <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold ring-2 ring-blue-300">
               {userInfo.username?.charAt(0).toUpperCase()}
             </div>
-            {/* Button to Logout */}
             <button
               onClick={handleLogout}
-              className="px-1 py-1 bg-bleu-400 text-white rounded-xl hover:bg-red-600 transition duration-200 ease-in-out"
+              className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-lg text-sm font-medium"
             >
               Déconnexion
             </button>
@@ -107,74 +70,73 @@ export default function Dashboard() {
         )}
       </header>
 
-      {/* MAIN */}
-      <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+      {/* MAIN CONTENT */}
+      <main className="flex-1 p-6">
         {!userInfo ? (
-          <div className="flex items-center justify-center h-full animate-pulse">
-            <p className="text-gray-400 text-lg">
-              Chargement de votre session...
+          <div className="flex justify-center items-center h-full">
+            <p className="text-gray-400 animate-pulse text-lg">
+              Chargement de votre espace personnel...
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-            {/* LEFT SIDE: Forms */}
-            <div className="col-span-1 md:col-span-1 space-y-6">
-              <div className="bg-white/10 rounded-2xl shadow-md p-5 backdrop-blur hover:scale-105 transition duration-300">
-                <h2 className="text-xl font-semibold mb-4 text-blue-300">
-                  🎥 Ajouter un film
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+            {/* LEFT PANEL */}
+            <div className="space-y-6">
+              <div className="bg-white/10 p-5 rounded-2xl shadow-lg backdrop-blur transition hover:scale-[1.02]">
+                <h2 className="text-lg font-semibold text-pink-400 mb-3">
+                  🎞️ Ajouter un film
                 </h2>
-                <AddMovieForm onMovieAdded={handleMovieAdded} />
+                <AddMovieForm onMovieAdded={() => {}} />
               </div>
-              <div className="bg-white/10 rounded-2xl shadow-md p-5 backdrop-blur hover:scale-105 transition duration-300">
-                <h2 className="text-xl font-semibold mb-4 text-blue-300">
-                  📦 Créer une box
+              <div className="bg-white/10 p-5 rounded-2xl shadow-lg backdrop-blur transition hover:scale-[1.02]">
+                <h2 className="text-lg font-semibold text-emerald-400 mb-3">
+                  📦 Créer une salle (Box)
                 </h2>
                 <CreateBoxForm />
               </div>
-              {/* Bouton pour rejoindre la box */}
-              <div className="bg-white/10 rounded-2xl shadow-md p-5 backdrop-blur hover:scale-105 transition duration-300">
-                <div className="space-y-4">
-                  <JoinRoomComponent />
-                </div>
+              <div className="bg-white/10 p-5 rounded-2xl shadow-lg backdrop-blur transition hover:scale-[1.02]">
+                <h2 className="text-lg font-semibold text-yellow-300 mb-3">
+                  🔑 Rejoindre une room
+                </h2>
+                <JoinRoomComponent />
               </div>
             </div>
 
-            {/* RIGHT SIDE: Placeholder pour VideoSyncComponent ou autre */}
-            <div className="md:col-span-2">
-              <div className="bg-white/5 p-6 rounded-2xl h-full border border-white/10 shadow-inner flex items-center justify-center text-gray-400 italic">
-                <h3>Qu'est-ce que CinéSync ?</h3>
-                CinéSync est une plateforme innovante qui permet à plusieurs
-                utilisateurs de regarder un film ensemble, en temps réel, comme
-                s’ils étaient dans la même pièce ! Plus besoin d’appuyer sur
-                "play" en même temps : tout est synchronisé automatiquement
-                grâce à notre technologie WebSocket.
-                <h3>👨‍👩‍👧‍👦 Fonctionnalités principales :</h3>
-                <ul className="list-disc pl-5">
-                  <li>Regardez des films ensemble, où que vous soyez</li>
-                  <li>Synchronisation automatique de la lecture</li>
-                  <li>Invitez vos amis à rejoindre votre session</li>
-                  <li>Interface simple et intuitive</li>
-                </ul>
-                <h3 className="mt-4">Comment ça marche ?</h3>
-                <p>
-                  CinéSync utilise une technologie de synchronisation avancée
-                  pour s'assurer que tous les utilisateurs regardent le même
-                  contenu en même temps. Lorsque vous démarrez un film, tous les
-                  participants reçoivent une notification et la lecture commence
-                  simultanément sur tous les appareils.
-                  <ul className="list-disc pl-5">
-                    <li>Un utilisateur choisit un film via lien valide</li>
-                      <li>🧑‍🤝‍🧑 Il invite ses amis via un lien ou un code ID </li>
-                      <li>Création de la box pour démarrer la session</li>
-                      <li>📽️ Tous les participants regardent le film en même temps</li>
-                    </ul>
-                    <h5 className="mt-4 text-sm text-gray-500">
-                      Note : Pour l'instant, la plateforme est en version bêta.Amuser vous à regarder des films avec vos amis   🎉 Le Fondateur de site <strong>BELGHIETI MOHAMED</strong>
-                    </h5>
-                </p>
+            {/* RIGHT PANEL */}
+            <div className="md:col-span-2 bg-white/5 p-6 rounded-2xl border border-white/10 shadow-inner text-gray-200 space-y-4">
+              <h2 className="text-2xl font-bold text-blue-300">
+                Bienvenue sur CinéSync 🎉
+              </h2>
+              <p>
+                <strong>CinéSync</strong> est une plateforme qui vous permet de{" "}
+                <span className="text-green-400 font-semibold">
+                  regarder des films avec vos amis à distance
+                </span>
+                , tout en restant synchronisés !
+              </p>
+
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Créer une salle (box) pour démarrer une session</li>
+                <li>Inviter des amis via un lien ou un ID</li>
+                <li>Regarder le film ensemble, synchronisé</li>
+                <li>Partage, plaisir, et ambiance cinéma à distance 🎬</li>
+              </ul>
+
+              <p className="mt-4">
+                Plus besoin de dire "t'appuies sur lecture maintenant ?" 😅
+                Grâce à notre système de synchronisation en temps réel,{" "}
+                <span className="text-purple-400 font-semibold">
+                  tout le monde voit le même moment du film
+                </span>{" "}
+                sans aucun effort !
+              </p>
+
+              <div className="text-sm text-gray-400 mt-6 italic">
+                💡 En version bêta – Amusez-vous à tester, inviter et partager !
+                <br />
+                Créé avec ❤️ par{" "}
+                <span className="text-white font-bold">BELGHIETI MOHAMED</span>
               </div>
-              {/* Tu peux décommenter la ligne ci-dessous quand tu veux intégrer le composant */}
-              {/* <VideoSyncComponent /> */}
             </div>
           </div>
         )}
@@ -182,7 +144,7 @@ export default function Dashboard() {
 
       {/* FOOTER */}
       <footer className="text-center text-xs text-gray-400 py-4 border-t border-white/10">
-        Ma9 Ma9 Harira
+        🎥 CinéSync – Une expérience cinéma 100% connectée. | Ma9 Ma9 Harira 😄
       </footer>
     </div>
   );
