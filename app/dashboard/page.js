@@ -122,7 +122,7 @@ export default function Dashboard() {
               </ul>
 
               <div className="bg-cyan-600/10 p-4 rounded-xl text-sm text-cyan-300 mt-4">
-                🎯 <strong>Plus besoin de dire :</strong>{" "}
+                 <strong>Plus besoin de dire :</strong>{" "}
                 <em>« T'appuies sur lecture maintenant ? »</em>
                 <br />
                 CinéSync synchronise automatiquement la vidéo sur tous les

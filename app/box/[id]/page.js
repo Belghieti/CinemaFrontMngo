@@ -10,7 +10,7 @@ export default function BoxPage() {
   const router = useRouter();
 
   const [token, setToken] = useState("");
-  const [box, setBox] = useState(null); // Contient { box: {...}, movie: {...} }
+  const [box, setBox] = useState(null);
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [userInfo, setUserInfo] = useState(null);
@@ -30,32 +30,24 @@ export default function BoxPage() {
       setToken(storedToken);
 
       try {
-        // User info
-        const userRes = await fetch(`${baseUrl}/auth/getUserInfo`, {
-          headers: { Authorization: `Bearer ${storedToken}` },
-        });
-        if (!userRes.ok)
-          throw new Error("Impossible de récupérer les infos utilisateur");
-        const userData = await userRes.json();
-        setUserInfo(userData);
+        const [userRes, boxRes, usersRes] = await Promise.all([
+          fetch(`${baseUrl}/auth/getUserInfo`, {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          }),
+          fetch(`${baseUrl}/api/boxes/${id}`, {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          }),
+          fetch(`${baseUrl}/auth/getAllUsers`, {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          }),
+        ]);
 
-        // Box data
-        const boxRes = await fetch(`${baseUrl}/api/boxes/${id}`, {
-          headers: { Authorization: `Bearer ${storedToken}` },
-        });
-        if (!boxRes.ok) throw new Error("Box non trouvée");
-        const boxData = await boxRes.json();
-        setBox(boxData);
+        if (!userRes.ok || !boxRes.ok || !usersRes.ok)
+          throw new Error("Erreur lors du chargement des données.");
 
-        // Users list
-        const usersRes = await fetch(`${baseUrl}/auth/getAllUsers`, {
-          headers: { Authorization: `Bearer ${storedToken}` },
-        });
-        if (!usersRes.ok)
-          throw new Error("Erreur lors de la récupération des utilisateurs");
-        const usersData = await usersRes.json();
-        setUsers(usersData);
-
+        setUserInfo(await userRes.json());
+        setBox(await boxRes.json());
+        setUsers(await usersRes.json());
         setLoading(false);
       } catch (error) {
         alert(error.message);
@@ -67,12 +59,10 @@ export default function BoxPage() {
   }, [id, router, baseUrl]);
 
   const handleInvite = async (userId) => {
-    if (!box || !box.box.hostId) {
-      alert("Erreur : les données de la box ne sont pas encore chargées.");
+    if (!box?.box?.hostId) {
+      alert("Données de la box incomplètes.");
       return;
     }
-
-    const senderId = box.box.hostId;
 
     try {
       const res = await fetch(`${baseUrl}/api/invitations/send`, {
@@ -82,19 +72,17 @@ export default function BoxPage() {
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body: new URLSearchParams({
-          senderId,
+          senderId: box.box.hostId,
           receiverId: userId,
           boxId: id,
         }),
       });
 
-      if (res.ok) {
-        alert("Invitation envoyée !");
-      } else {
-        alert("Erreur lors de l'envoi de l'invitation");
-      }
+      res.ok
+        ? alert("Invitation envoyée avec succès !")
+        : alert("Échec de l'envoi.");
     } catch (error) {
-      alert("Erreur réseau lors de l'envoi de l'invitation");
+      alert("Erreur réseau.");
     }
   };
 
@@ -104,66 +92,95 @@ export default function BoxPage() {
   };
 
   const filteredUsers = users
-    .filter((user) => user.id !== userInfo?.id)
-    .filter((user) =>
-      user.username.toLowerCase().includes(search.toLowerCase())
-    );
+    .filter((u) => u.id !== userInfo?.id)
+    .filter((u) => u.username.toLowerCase().includes(search.toLowerCase()));
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white text-lg animate-pulse">
-        Chargement de votre session...
+        Chargement de la session...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-900 text-white p-6 md:p-8 flex flex-col items-center font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6 font-sans flex flex-col items-center">
       {/* HEADER */}
-      <header className="w-full flex justify-between items-center p-6 border-b border-white/20 backdrop-blur-md bg-white/5 shadow-xl z-50 rounded-xl">
-        <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-blue-500 to-blue-700 text-transparent bg-clip-text">
-          🎬 Cinema en ligne
+      <header className="w-full flex justify-between items-center p-6 bg-white/5 border-b border-white/10 rounded-xl shadow-lg backdrop-blur-md">
+        <h1 className="text-3xl font-bold text-blue-400 tracking-tight">
+          🎬 CinéSync - Room
         </h1>
-        <div className="flex items-center gap-6">
-          <div className="flex flex-col items-end text-right">
-            <p className="text-sm text-gray-300 font-medium">
-              {userInfo.username}
-            </p>
+        <div className="flex items-center gap-5">
+          <div className="text-right">
+            <p className="text-sm font-medium">{userInfo.username}</p>
             <p className="text-xs text-gray-400">ID: {userInfo.id}</p>
           </div>
-          <div className="w-14 h-14 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg ring-4 ring-offset-2 ring-blue-200">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold shadow ring-2 ring-white/20">
             {userInfo.username.charAt(0).toUpperCase()}
           </div>
           <button
             onClick={handleLogout}
-            className="px-3 py-2 bg-blue-400 text-white rounded-xl hover:bg-red-600 transition duration-200 ease-in-out"
+            className="bg-red-500 hover:bg-red-600 px-3 py-1 rounded-lg text-sm transition"
           >
             Déconnexion
           </button>
         </div>
       </header>
 
-      {/* MAIN CONTENT */}
-      <main className="w-full flex-1 p-8 flex flex-col gap-8">
-        {/* Affichage du nom de la box */}
-        <h2 className="text-4xl font-bold text-center text-blue-500">
-          🎥 Room: {box.box.name}
-          {box.box.id && <span className="text-sm text-gray-400"> (Id: {box.box.id}) tu peux inviter des utilisateurs à rejoindre cette room.</span>}
-        </h2>
-    
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Video component */}
-          <div className="flex-1 bg-white/5 p-6 rounded-2xl shadow-lg">
-            <VideoSyncComponent boxId={id} />
-          </div>
+      {/* MAIN */}
+      <main className="w-full mt-8 flex flex-col lg:flex-row gap-8">
+        {/* LEFT - VIDEO PLAYER */}
+        <div className="flex-1 bg-white/5 p-6 rounded-2xl shadow-lg">
+          <h2 className="text-2xl font-semibold text-blue-300 mb-4">
+            🎥 Room: <span className="text-white">{box.box.name}</span>
+          </h2>
+          <p className="text-sm text-gray-400 mb-4">
+            ID de la room : <code className="text-white">{box.box.id}</code>
+          </p>
+          <VideoSyncComponent boxId={id} />
+        </div>
 
-        
+        {/* RIGHT - INVITE USERS */}
+        <div className="w-full lg:w-1/3 bg-white/5 p-6 rounded-2xl shadow-xl space-y-4">
+          <h3 className="text-xl font-semibold text-green-400">
+            👥 Inviter des amis
+          </h3>
+          <input
+            type="text"
+            placeholder="Rechercher un utilisateur..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-green-400 placeholder-gray-400 text-sm"
+          />
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {filteredUsers.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">
+                Aucun utilisateur trouvé.
+              </p>
+            ) : (
+              filteredUsers.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between bg-white/10 p-3 rounded-lg hover:bg-white/20 transition"
+                >
+                  <span className="font-medium">{user.username}</span>
+                  <button
+                    onClick={() => handleInvite(user.id)}
+                    className="bg-green-500 hover:bg-green-600 text-sm px-3 py-1 rounded-md"
+                  >
+                    Inviter
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </main>
 
       {/* FOOTER */}
-      <footer className="w-full p-6 border-t border-white/20 text-center text-gray-300 mt-8">
-        <p className="text-xs">Ma9 Ma9 Harira</p>
+      <footer className="w-full text-center text-xs text-gray-500 mt-12 pt-6 border-t border-white/10">
+        🎬 CinéSync – Une soirée cinéma en ligne avec vos amis. <br />
+        Made with ❤️ by BELGHIETI MOHAMED | Beta version.
       </footer>
     </div>
   );
