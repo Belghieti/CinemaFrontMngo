@@ -148,7 +148,7 @@ export default function BoxPage() {
         {/* Affichage du nom de la box */}
         <h2 className="text-4xl font-bold text-center text-blue-500">
           🎥 Room: {box.box.name}
-          {box.box.id && <span className="text-sm text-gray-400"> (ID: {box.box.id})</span>}
+          {box.box.id && <span className="text-sm text-gray-400"> (Id: {box.box.id}) tu peux inviter des utilisateurs à rejoindre cette room.</span>}
         </h2>
     
         <div className="flex flex-col md:flex-row gap-8">
