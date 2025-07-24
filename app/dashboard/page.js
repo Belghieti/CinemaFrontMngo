@@ -133,18 +133,8 @@ export default function Dashboard() {
               </div>
               {/* Bouton pour rejoindre la box */}
               <div className="bg-white/10 rounded-2xl shadow-md p-5 backdrop-blur hover:scale-105 transition duration-300">
-                <h2 className="text-xl font-semibold mb-4 text-blue-300">
-                  🔗 Rejoindre une box
-                </h2>
-                <input
-                  type="number"
-                  placeholder="Entrez l'ID de la box"
-                  className="w-full p-2 mb-3 rounded bg-slate-800 text-white border border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={boxId || ""}
-                  onChange={(e) => setBoxId(e.target.value)}
-                />
-
-                <div className="w-full px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition duration-200 ease-in-out transform hover:scale-105">
+               
+                <div className="space-y-4">
                   <JoinRoomComponent />
                 </div>
               </div>

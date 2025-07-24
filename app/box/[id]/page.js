@@ -148,8 +148,9 @@ export default function BoxPage() {
         {/* Affichage du nom de la box */}
         <h2 className="text-4xl font-bold text-center text-blue-500">
           🎥 Room: {box.box.name}
+          {box.box.id && <span className="text-sm text-gray-400"> (ID: {box.box.id})</span>}
         </h2>
-
+    
         <div className="flex flex-col md:flex-row gap-8">
           {/* Video component */}
           <div className="flex-1 bg-white/5 p-6 rounded-2xl shadow-lg">

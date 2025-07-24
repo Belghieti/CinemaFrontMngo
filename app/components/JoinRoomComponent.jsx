@@ -27,6 +27,7 @@ export default function JoinRoomComponent() {
       <input
         type="text"
         value={roomId}
+        className="bg-white/10 rounded-2xl shadow-md p-5 backdrop-blur hover:scale-105 transition duration-300"
         onChange={(e) => setRoomId(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Entrez l'ID de la room"
@@ -44,7 +45,7 @@ export default function JoinRoomComponent() {
           padding: "10px 20px",
           fontSize: "16px",
           borderRadius: "5px",
-          backgroundColor: "#0070f3",
+          backgroundColor: "#275488ff",
           color: "white",
           cursor: "pointer",
         }}
