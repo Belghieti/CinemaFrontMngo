@@ -145,35 +145,8 @@ export default function BoxPage() {
           <h3 className="text-xl font-semibold text-green-400">
             👥 Inviter des amis
           </h3>
-          <input
-            type="text"
-            placeholder="Rechercher un utilisateur..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-green-400 placeholder-gray-400 text-sm"
-          />
-          <div className="space-y-2 max-h-72 overflow-y-auto">
-            {filteredUsers.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">
-                Aucun utilisateur trouvé.
-              </p>
-            ) : (
-              filteredUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between bg-white/10 p-3 rounded-lg hover:bg-white/20 transition"
-                >
-                  <span className="font-medium">{user.username}</span>
-                  <button
-                    onClick={() => handleInvite(user.id)}
-                    className="bg-green-500 hover:bg-green-600 text-sm px-3 py-1 rounded-md"
-                  >
-                    Inviter
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
+          
+          
         </div>
       </main>
 
