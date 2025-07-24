@@ -12,10 +12,38 @@ export default function Dashboard() {
   const [userInfo, setUserInfo] = useState(null);
   const router = useRouter();
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    router.push("/");
+  const handleLogout = async () => {
+    if (!token) {
+      alert("Vous n'êtes pas connecté");
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        "https://cinemamongo-production.up.railway.app/auth/logout",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) {
+        alert("Erreur lors de la déconnexion");
+        return;
+      }
+
+      // Supprimer le token localement
+      localStorage.removeItem("token");
+
+      alert("Déconnexion réussie !");
+      router.push("/"); // rediriger vers la page d'accueil ou login
+    } catch (error) {
+      alert("Erreur réseau lors de la déconnexion");
+    }
   };
+
 
   const fetchUserInfo = () => {
     const token = localStorage.getItem("token");
