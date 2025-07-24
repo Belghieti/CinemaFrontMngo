@@ -11,8 +11,6 @@ export default function BoxPage() {
 
   const [token, setToken] = useState("");
   const [box, setBox] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [search, setSearch] = useState("");
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,24 +28,20 @@ export default function BoxPage() {
       setToken(storedToken);
 
       try {
-        const [userRes, boxRes, usersRes] = await Promise.all([
+        const [userRes, boxRes] = await Promise.all([
           fetch(`${baseUrl}/auth/getUserInfo`, {
             headers: { Authorization: `Bearer ${storedToken}` },
           }),
           fetch(`${baseUrl}/api/boxes/${id}`, {
             headers: { Authorization: `Bearer ${storedToken}` },
           }),
-          fetch(`${baseUrl}/auth/getAllUsers`, {
-            headers: { Authorization: `Bearer ${storedToken}` },
-          }),
         ]);
 
-        if (!userRes.ok || !boxRes.ok || !usersRes.ok)
+        if (!userRes.ok || !boxRes.ok)
           throw new Error("Erreur lors du chargement des données.");
 
         setUserInfo(await userRes.json());
         setBox(await boxRes.json());
-        setUsers(await usersRes.json());
         setLoading(false);
       } catch (error) {
         alert(error.message);
@@ -58,42 +52,10 @@ export default function BoxPage() {
     fetchData();
   }, [id, router, baseUrl]);
 
-  const handleInvite = async (userId) => {
-    if (!box?.box?.hostId) {
-      alert("Données de la box incomplètes.");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${baseUrl}/api/invitations/send`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          senderId: box.box.hostId,
-          receiverId: userId,
-          boxId: id,
-        }),
-      });
-
-      res.ok
-        ? alert("Invitation envoyée avec succès !")
-        : alert("Échec de l'envoi.");
-    } catch (error) {
-      alert("Erreur réseau.");
-    }
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("token");
     router.push("/");
   };
-
-  const filteredUsers = users
-    .filter((u) => u.id !== userInfo?.id)
-    .filter((u) => u.username.toLowerCase().includes(search.toLowerCase()));
 
   if (loading) {
     return (
@@ -138,37 +100,6 @@ export default function BoxPage() {
             ID de la room : <code className="text-white">{box.box.id}</code>
           </p>
           <VideoSyncComponent boxId={id} />
-        </div>
-
-        {/* RIGHT - INVITE USERS */}
-        <div className="w-full lg:w-1/3 bg-white/5 p-6 rounded-2xl shadow-xl space-y-4">
-          <h3 className="text-xl font-semibold text-green-400">
-            👥 Inviter des amis
-          </h3>
-          <input
-            type="text"
-            placeholder="Rechercher un utilisateur..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-green-400 placeholder-gray-400 text-sm"
-          />
-          <div className="space-y-2 max-h-72 overflow-y-auto">
-            {filteredUsers.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">
-                Aucun utilisateur trouvé.
-              </p>
-            ) : (
-              filteredUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between bg-white/10 p-3 rounded-lg hover:bg-white/20 transition"
-                >
-                  <span className="font-medium">{user.username}</span>
-                 
-                </div>
-              ))
-            )}
-          </div>
         </div>
       </main>
 
