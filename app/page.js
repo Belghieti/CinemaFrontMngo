@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 export default function LoginPage() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  const [username, setUsername] = useState("A");
-  const [password, setPassword] = useState("1234");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const router = useRouter();
 
   const handleLogin = async () => {
