@@ -83,7 +83,7 @@ export default function Dashboard() {
       {/* HEADER */}
       <header className="w-full flex justify-between items-center p-6 border-b border-white/10 backdrop-blur bg-white/5 shadow-md">
         <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-blue-600 text-transparent bg-clip-text">
-          🎬 Cinema en ligne
+          🎬 CinéSync – Regardez des films ensemble, même à distance !{" "}
         </h1>
         {userInfo && (
           <div className="flex items-center gap-4">
@@ -133,7 +133,6 @@ export default function Dashboard() {
               </div>
               {/* Bouton pour rejoindre la box */}
               <div className="bg-white/10 rounded-2xl shadow-md p-5 backdrop-blur hover:scale-105 transition duration-300">
-               
                 <div className="space-y-4">
                   <JoinRoomComponent />
                 </div>
@@ -143,7 +142,33 @@ export default function Dashboard() {
             {/* RIGHT SIDE: Placeholder pour VideoSyncComponent ou autre */}
             <div className="md:col-span-2">
               <div className="bg-white/5 p-6 rounded-2xl h-full border border-white/10 shadow-inner flex items-center justify-center text-gray-400 italic">
-                🎬 Vidéo à venir... (Composant VideoSyncComponent)
+                <h3>Qu'est-ce que CinéSync ?</h3>
+                CinéSync est une plateforme innovante qui permet à plusieurs
+                utilisateurs de regarder un film ensemble, en temps réel, comme
+                s’ils étaient dans la même pièce ! Plus besoin d’appuyer sur
+                "play" en même temps : tout est synchronisé automatiquement
+                grâce à notre technologie WebSocket.
+                <h3>👨‍👩‍👧‍👦 Fonctionnalités principales :</h3>
+                <ul className="list-disc pl-5">
+                  <li>Regardez des films ensemble, où que vous soyez</li>
+                  <li>Synchronisation automatique de la lecture</li>
+                  <li>Invitez vos amis à rejoindre votre session</li>
+                  <li>Interface simple et intuitive</li>
+                </ul>
+                <h3 className="mt-4">Comment ça marche ?</h3>
+                <p>
+                  CinéSync utilise une technologie de synchronisation avancée
+                  pour s'assurer que tous les utilisateurs regardent le même
+                  contenu en même temps. Lorsque vous démarrez un film, tous les
+                  participants reçoivent une notification et la lecture commence
+                  simultanément sur tous les appareils.
+                  <ul className="list-disc pl-5">
+                    <li>Un utilisateur choisit un film via lien valide</li>
+                      <li>🧑‍🤝‍🧑 Il invite ses amis via un lien ou un code ID </li>
+                      <li>Création de la box pour démarrer la session</li>
+                      <li>📽️ Tous les participants regardent le film en même temps</li>
+                  </ul>
+                </p>
               </div>
               {/* Tu peux décommenter la ligne ci-dessous quand tu veux intégrer le composant */}
               {/* <VideoSyncComponent /> */}
