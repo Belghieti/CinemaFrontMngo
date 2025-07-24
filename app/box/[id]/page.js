@@ -87,6 +87,8 @@ export default function BoxPage() {
   };
 
   const handleLogout = async () => {
+    const token = localStorage.getItem("token");
+
     if (!token) {
       alert("Vous n'êtes pas connecté");
       return;
@@ -108,15 +110,14 @@ export default function BoxPage() {
         return;
       }
 
-      // Supprimer le token localement
       localStorage.removeItem("token");
-
       alert("Déconnexion réussie !");
-      router.push("/"); // rediriger vers la page d'accueil ou login
+      router.push("/");
     } catch (error) {
       alert("Erreur réseau lors de la déconnexion");
     }
   };
+
 
 
   const filteredUsers = users
