@@ -167,7 +167,10 @@ export default function Dashboard() {
                       <li>🧑‍🤝‍🧑 Il invite ses amis via un lien ou un code ID </li>
                       <li>Création de la box pour démarrer la session</li>
                       <li>📽️ Tous les participants regardent le film en même temps</li>
-                  </ul>
+                    </ul>
+                    <h5 className="mt-4 text-sm text-gray-500">
+                      Note : Pour l'instant, la plateforme est en version bêta.Amuser vous à regarder des films avec vos amis   🎉 Le Fondateur de site <strong>BELGHIETI MOHAMED</strong>
+                    </h5>
                 </p>
               </div>
               {/* Tu peux décommenter la ligne ci-dessous quand tu veux intégrer le composant */}
