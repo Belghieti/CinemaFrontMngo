@@ -46,23 +46,21 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-900 text-white font-sans flex flex-col">
       {/* HEADER */}
       <header className="w-full flex justify-between items-center p-6 border-b border-white/10 bg-white/5 backdrop-blur shadow-md">
-        <h1 className="text-xl sm:text-3xl font-extrabold bg-gradient-to-r from-pink-400 to-blue-500 text-transparent bg-clip-text">
-          🎬 CinéSync – Cinéma partagé, à distance !
+        <h1 className="text-xl sm:text-3xl font-extrabold bg-gradient-to-r from-fuchsia-500 to-cyan-400 text-transparent bg-clip-text">
+          🎬 CinéSync – Le cinéma ensemble, même à distance
         </h1>
         {userInfo && (
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="font-semibold text-sm text-white">
-                {userInfo.username}
-              </p>
+              <p className="font-semibold text-sm">{userInfo.username}</p>
               <p className="text-xs text-gray-400">ID: {userInfo.id}</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold ring-2 ring-blue-300">
+            <div className="w-10 h-10 rounded-full bg-cyan-600 flex items-center justify-center font-bold text-white ring-2 ring-cyan-300">
               {userInfo.username?.charAt(0).toUpperCase()}
             </div>
             <button
               onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-lg text-sm font-medium"
+              className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-lg text-sm font-medium transition"
             >
               Déconnexion
             </button>
@@ -82,59 +80,60 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
             {/* LEFT PANEL */}
             <div className="space-y-6">
-              <div className="bg-white/10 p-5 rounded-2xl shadow-lg backdrop-blur transition hover:scale-[1.02]">
+              <div className="bg-white/10 p-5 rounded-2xl shadow-xl backdrop-blur transition hover:scale-[1.02]">
                 <h2 className="text-lg font-semibold text-pink-400 mb-3">
                   🎞️ Ajouter un film
                 </h2>
                 <AddMovieForm onMovieAdded={() => {}} />
               </div>
-              <div className="bg-white/10 p-5 rounded-2xl shadow-lg backdrop-blur transition hover:scale-[1.02]">
+              <div className="bg-white/10 p-5 rounded-2xl shadow-xl backdrop-blur transition hover:scale-[1.02]">
                 <h2 className="text-lg font-semibold text-emerald-400 mb-3">
-                  📦 Créer une salle (Box)
+                  📦 Créer une salle
                 </h2>
                 <CreateBoxForm />
               </div>
-              <div className="bg-white/10 p-5 rounded-2xl shadow-lg backdrop-blur transition hover:scale-[1.02]">
+              <div className="bg-white/10 p-5 rounded-2xl shadow-xl backdrop-blur transition hover:scale-[1.02]">
                 <h2 className="text-lg font-semibold text-yellow-300 mb-3">
-                  🔑 Rejoindre une room
+                  🔑 Rejoindre une salle
                 </h2>
                 <JoinRoomComponent />
               </div>
             </div>
 
-            {/* RIGHT PANEL */}
+            {/* RIGHT PANEL – WELCOME */}
             <div className="md:col-span-2 bg-white/5 p-6 rounded-2xl border border-white/10 shadow-inner text-gray-200 space-y-4">
-              <h2 className="text-2xl font-bold text-blue-300">
-                Bienvenue sur CinéSync 🎉
+              <h2 className="text-3xl font-extrabold text-cyan-400 mb-2">
+                ✨ Bienvenue sur CinéSync
               </h2>
-              <p>
-                <strong>CinéSync</strong> est une plateforme qui vous permet de{" "}
+              <p className="leading-relaxed">
+                <span className="text-white font-semibold">CinéSync</span> est
+                votre plateforme de streaming partagé :{" "}
                 <span className="text-green-400 font-semibold">
-                  regarder des films avec vos amis à distance
+                  regardez des films entre amis, même à distance
                 </span>
-                , tout en restant synchronisés !
+                , avec une synchronisation automatique parfaite.
               </p>
 
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Créer une salle (box) pour démarrer une session</li>
-                <li>Inviter des amis via un lien ou un ID</li>
-                <li>Regarder le film ensemble, synchronisé</li>
-                <li>Partage, plaisir, et ambiance cinéma à distance 🎬</li>
+              <ul className="list-disc pl-6 space-y-1">
+                <li>📽️ Créez une salle (box) privée</li>
+                <li>🔗 Invitez vos amis via un lien ou un ID</li>
+                <li>🎬 Lancez le film et profitez ensemble, synchronisés</li>
+                <li>💬 Ambiance conviviale garantie, à distance !</li>
               </ul>
 
-              <p className="mt-4">
-                Plus besoin de dire "t'appuies sur lecture maintenant ?" 😅
-                Grâce à notre système de synchronisation en temps réel,{" "}
-                <span className="text-purple-400 font-semibold">
-                  tout le monde voit le même moment du film
-                </span>{" "}
-                sans aucun effort !
-              </p>
+              <div className="bg-cyan-600/10 p-4 rounded-xl text-sm text-cyan-300 mt-4">
+                🎯 <strong>Plus besoin de dire :</strong>{" "}
+                <em>« T'appuies sur lecture maintenant ? »</em>
+                <br />
+                CinéSync synchronise automatiquement la vidéo sur tous les
+                écrans.
+              </div>
 
               <div className="text-sm text-gray-400 mt-6 italic">
-                💡 En version bêta – Amusez-vous à tester, inviter et partager !
+                💡 Plateforme en version bêta – Testez, invitez, et amusez-vous
+                librement !
                 <br />
-                Créé avec ❤️ par{" "}
+                Créée avec ❤️ par{" "}
                 <span className="text-white font-bold">BELGHIETI MOHAMED</span>
               </div>
             </div>
@@ -143,8 +142,9 @@ export default function Dashboard() {
       </main>
 
       {/* FOOTER */}
-      <footer className="text-center text-xs text-gray-400 py-4 border-t border-white/10">
-        🎥 CinéSync – Une expérience cinéma 100% connectée. | Ma9 Ma9 Harira 😄
+      <footer className="text-center text-xs text-gray-500 py-4 border-t border-white/10">
+        🎥 CinéSync – Vivez le cinéma ensemble, même à distance | Ma9 Ma9 Harira
+        😄
       </footer>
     </div>
   );
