@@ -37,7 +37,9 @@ export default function BoxPage() {
           fetch(`${baseUrl}/api/boxes/${id}`, {
             headers: { Authorization: `Bearer ${storedToken}` },
           }),
-         
+          fetch(`${baseUrl}/auth/getBoxUsers/${id}`, {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          }),
         ]);
 
         if (!userRes.ok || !boxRes.ok || !usersRes.ok)
