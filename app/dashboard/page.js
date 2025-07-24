@@ -143,8 +143,8 @@ export default function Dashboard() {
 
       {/* FOOTER */}
       <footer className="text-center text-xs text-gray-500 py-4 border-t border-white/10">
-        🎥 CinéSync – Vivez le cinéma ensemble, même à distance | Ma9 Ma9 Harira
-        😄
+        🎥 CinéSync - Une soirée cinéma en ligne avec vos amis.
+        MADE with ❤️ by BELGHIETI MOHAMED | Beta version.
       </footer>
     </div>
   );
