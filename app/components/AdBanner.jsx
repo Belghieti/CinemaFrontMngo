@@ -23,14 +23,12 @@ export default function AdBanner() {
   }, []);
 
   return (
-    <ins
-      ref={adRef}
-      className="adsbygoogle"
-      style={{ display: "block", textAlign: "center" }}
-      data-ad-client="ca-pub-7819050999307874"
-      data-ad-slot="1234567890" // 🔁 Remplace par ton vrai ad-slot
-      data-ad-format="auto"
-      data-full-width-responsive="true"
-    />
+    <div>
+      <script
+        async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7819050999307874"
+        crossorigin="anonymous"
+      ></script>
+    </div>
   );
 }
