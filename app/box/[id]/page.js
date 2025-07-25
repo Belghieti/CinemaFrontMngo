@@ -135,6 +135,11 @@ export default function BoxPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6 font-sans flex flex-col items-center">
       {/* HEADER */}
+      <script
+        async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7819050999307874"
+        crossorigin="anonymous"
+      ></script>
       <header className="w-full flex justify-between items-center p-6 bg-white/5 border-b border-white/10 rounded-xl shadow-lg backdrop-blur-md">
         <h1 className="text-3xl font-bold text-blue-400 tracking-tight">
           🎬 CinéSync - Room
@@ -193,7 +198,6 @@ export default function BoxPage() {
                   className="flex items-center justify-between bg-white/10 p-3 rounded-lg hover:bg-white/20 transition"
                 >
                   <span className="font-medium">{user.username}</span>
-                 
                 </div>
               ))
             )}

@@ -73,6 +73,11 @@ const handleLogout = async () => {
   return (
     <div className="min-h-screen bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-900 text-white font-sans flex flex-col">
       {/* HEADER */}
+      <script
+        async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7819050999307874"
+        crossorigin="anonymous"
+      ></script>
       <header className="w-full flex justify-between items-center p-6 border-b border-white/10 bg-white/5 backdrop-blur shadow-md">
         <h1 className="text-xl sm:text-3xl font-extrabold bg-gradient-to-r from-fuchsia-500 to-cyan-400 text-transparent bg-clip-text">
           🎬 CinéSync – Le cinéma ensemble, même à distance
@@ -150,7 +155,7 @@ const handleLogout = async () => {
               </ul>
 
               <div className="bg-cyan-600/10 p-4 rounded-xl text-sm text-cyan-300 mt-4">
-                 <strong>Plus besoin de dire :</strong>{" "}
+                <strong>Plus besoin de dire :</strong>{" "}
                 <em>« T'appuies sur lecture maintenant ? »</em>
                 <br />
                 CinéSync synchronise automatiquement la vidéo sur tous les
@@ -171,8 +176,8 @@ const handleLogout = async () => {
 
       {/* FOOTER */}
       <footer className="text-center text-xs text-gray-500 py-4 border-t border-white/10">
-        🎥 CinéSync - Une soirée cinéma en ligne avec vos amis.
-        MADE with ❤️ by BELGHIETI MOHAMED | Beta version.
+        🎥 CinéSync - Une soirée cinéma en ligne avec vos amis. MADE with ❤️ by
+        BELGHIETI MOHAMED | Beta version.
       </footer>
     </div>
   );
