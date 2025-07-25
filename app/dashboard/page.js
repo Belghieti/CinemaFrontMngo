@@ -12,38 +12,37 @@ export default function Dashboard() {
   const [userInfo, setUserInfo] = useState(null);
   const router = useRouter();
 
-const handleLogout = async () => {
-  const token = localStorage.getItem("token");
+  const handleLogout = async () => {
+    const token = localStorage.getItem("token");
 
-  if (!token) {
-    alert("Vous n'êtes pas connecté");
-    return;
-  }
-
-  try {
-    const res = await fetch(
-      "https://cinemamongo-production.up.railway.app/auth/logout",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    if (!res.ok) {
-      alert("Erreur lors de la déconnexion");
+    if (!token) {
+      alert("Vous n'êtes pas connecté");
       return;
     }
 
-    localStorage.removeItem("token");
-    alert("Déconnexion réussie !");
-    router.push("/");
-  } catch (error) {
-    alert("Erreur réseau lors de la déconnexion");
-  }
-};
+    try {
+      const res = await fetch(
+        "https://cinemamongo-production.up.railway.app/auth/logout",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
+      if (!res.ok) {
+        alert("Erreur lors de la déconnexion");
+        return;
+      }
+
+      localStorage.removeItem("token");
+      alert("Déconnexion réussie !");
+      router.push("/");
+    } catch (error) {
+      alert("Erreur réseau lors de la déconnexion");
+    }
+  };
 
   const fetchUserInfo = () => {
     const token = localStorage.getItem("token");
@@ -68,16 +67,27 @@ const handleLogout = async () => {
 
   useEffect(() => {
     fetchUserInfo();
+
+    // Afficher la pub Google
+    if (typeof window !== "undefined") {
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (e) {
+        console.error("Adsense error", e);
+      }
+    }
   }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-900 text-white font-sans flex flex-col">
-      {/* HEADER */}
+      {/* SCRIPT GOOGLE ADSENSE */}
       <script
         async
         src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7819050999307874"
-        crossorigin="anonymous"
+        crossOrigin="anonymous"
       ></script>
+
+      {/* HEADER */}
       <header className="w-full flex justify-between items-center p-6 border-b border-white/10 bg-white/5 backdrop-blur shadow-md">
         <h1 className="text-xl sm:text-3xl font-extrabold bg-gradient-to-r from-fuchsia-500 to-cyan-400 text-transparent bg-clip-text">
           🎬 CinéSync – Le cinéma ensemble, même à distance
@@ -162,10 +172,21 @@ const handleLogout = async () => {
                 écrans.
               </div>
 
+              {/* 📢 Bloc PUBLICITAIRE ici */}
+              <div className="my-8">
+                <ins
+                  className="adsbygoogle"
+                  style={{ display: "block", textAlign: "center" }}
+                  data-ad-client="ca-pub-7819050999307874"
+                  data-ad-slot="1234567890"
+                  data-ad-format="auto"
+                  data-full-width-responsive="true"
+                ></ins>
+              </div>
+
               <div className="text-sm text-gray-400 mt-6 italic">
                 💡 Plateforme en version bêta – Testez, invitez, et amusez-vous
-                librement !
-                <br />
+                librement !<br />
                 Créée avec ❤️ par{" "}
                 <span className="text-white font-bold">BELGHIETI MOHAMED</span>
               </div>
