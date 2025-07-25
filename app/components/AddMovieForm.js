@@ -1,4 +1,3 @@
-"use client";
 import React, { useState } from "react";
 
 export default function AddMovieForm({ onMovieAdded }) {
@@ -24,30 +23,32 @@ export default function AddMovieForm({ onMovieAdded }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ title, description, videoUrl }),
+        body: JSON.stringify({
+          title,
+          description,
+          videoUrl,
+        }),
       });
 
       if (!res.ok) {
-        if (res.status === 403) {
-          setError("Accès refusé : token invalide ou expiré.");
-        } else {
-          const errorText = await res.text();
-          setError(`Erreur lors de l'ajout du film: ${errorText}`);
-        }
-        throw new Error(`Erreur: ${res.status}`);
+        const errorText = await res.text();
+        setError(`Erreur lors de l'ajout du film: ${errorText}`);
+        throw new Error(`Erreur: ${res.status} - ${errorText}`);
       }
 
-      const newMovie = await res.json();
-      onMovieAdded(newMovie);
+      const newMovie = await res.json(); // Le film ajouté
+      onMovieAdded(newMovie); // Passer le film ajouté à la fonction onMovieAdded
       setTitle("");
       setDescription("");
       setVideoUrl("");
-      setError("");
+      setError(""); // Clear error on success
     } catch (err) {
+      setError(`Erreur de connexion au serveur: ${err.message}`);
       console.error("Erreur lors de l'ajout du film:", err);
-      if (!error) setError(`Erreur de connexion au serveur: ${err.message}`);
     }
   };
+
+
 
   return (
     <form
