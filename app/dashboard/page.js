@@ -80,12 +80,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-900 text-white font-sans flex flex-col">
-      {/* SCRIPT GOOGLE ADSENSE */}
-      <script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7819050999307874"
-        crossOrigin="anonymous"
-      ></script>
+    
 
       {/* HEADER */}
       <header className="w-full flex justify-between items-center p-6 border-b border-white/10 bg-white/5 backdrop-blur shadow-md">
