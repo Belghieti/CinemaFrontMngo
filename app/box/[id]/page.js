@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import VideoSyncComponent from "../../components/VideoSyncComponent";
+import AdBanner from "@/app/components/AdBanner";
 
 export default function BoxPage() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -56,15 +57,6 @@ export default function BoxPage() {
     }
 
     fetchData();
-
-    // Google AdSense load
-    if (typeof window !== "undefined") {
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (e) {
-        console.error("Adsense error", e);
-      }
-    }
   }, [id, router, baseUrl]);
 
   const handleInvite = async (userId) => {
@@ -97,6 +89,7 @@ export default function BoxPage() {
 
   const handleLogout = async () => {
     const token = localStorage.getItem("token");
+
     if (!token) {
       alert("Vous n'êtes pas connecté");
       return;
@@ -126,6 +119,8 @@ export default function BoxPage() {
     }
   };
 
+
+
   const filteredUsers = users
     .filter((u) => u.id !== userInfo?.id)
     .filter((u) => u.username.toLowerCase().includes(search.toLowerCase()));
@@ -140,10 +135,8 @@ export default function BoxPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6 font-sans flex flex-col items-center">
-      {/* Google AdSense script */}
-      
-
       {/* HEADER */}
+      <AdBanner />
       <header className="w-full flex justify-between items-center p-6 bg-white/5 border-b border-white/10 rounded-xl shadow-lg backdrop-blur-md">
         <h1 className="text-3xl font-bold text-blue-400 tracking-tight">
           🎬 CinéSync - Room
@@ -175,20 +168,7 @@ export default function BoxPage() {
           <p className="text-sm text-gray-400 mb-4">
             ID de la room : <code className="text-white">{box.box.id}</code>
           </p>
-
           <VideoSyncComponent boxId={id} />
-
-          {/* Bloc Publicité Google AdSense */}
-          <div className="mt-6">
-            <ins
-              className="adsbygoogle"
-              style={{ display: "block", textAlign: "center" }}
-              data-ad-client="ca-pub-7819050999307874"
-              data-ad-slot="1234567890"
-              data-ad-format="auto"
-              data-full-width-responsive="true"
-            ></ins>
-          </div>
         </div>
 
         {/* RIGHT - INVITE USERS */}
@@ -215,12 +195,7 @@ export default function BoxPage() {
                   className="flex items-center justify-between bg-white/10 p-3 rounded-lg hover:bg-white/20 transition"
                 >
                   <span className="font-medium">{user.username}</span>
-                  <button
-                    onClick={() => handleInvite(user.id)}
-                    className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded-md"
-                  >
-                    Inviter
-                  </button>
+                 
                 </div>
               ))
             )}

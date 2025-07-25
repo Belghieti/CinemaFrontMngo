@@ -6,43 +6,45 @@ import VideoSyncComponent from "../components/VideoSyncComponent";
 import CreateBoxForm from "../components/CreateBoxForm";
 import AddMovieForm from "../components/AddMovieForm";
 import JoinRoomComponent from "../components/JoinRoomComponent";
+import AdBanner from "../components/AdBanner";
 
 export default function Dashboard() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const [userInfo, setUserInfo] = useState(null);
   const router = useRouter();
 
-  const handleLogout = async () => {
-    const token = localStorage.getItem("token");
+const handleLogout = async () => {
+  const token = localStorage.getItem("token");
 
-    if (!token) {
-      alert("Vous n'êtes pas connecté");
+  if (!token) {
+    alert("Vous n'êtes pas connecté");
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      "https://cinemamongo-production.up.railway.app/auth/logout",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      alert("Erreur lors de la déconnexion");
       return;
     }
 
-    try {
-      const res = await fetch(
-        "https://cinemamongo-production.up.railway.app/auth/logout",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+    localStorage.removeItem("token");
+    alert("Déconnexion réussie !");
+    router.push("/");
+  } catch (error) {
+    alert("Erreur réseau lors de la déconnexion");
+  }
+};
 
-      if (!res.ok) {
-        alert("Erreur lors de la déconnexion");
-        return;
-      }
-
-      localStorage.removeItem("token");
-      alert("Déconnexion réussie !");
-      router.push("/");
-    } catch (error) {
-      alert("Erreur réseau lors de la déconnexion");
-    }
-  };
 
   const fetchUserInfo = () => {
     const token = localStorage.getItem("token");
@@ -67,22 +69,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchUserInfo();
-
-    // Afficher la pub Google
-    if (typeof window !== "undefined") {
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (e) {
-        console.error("Adsense error", e);
-      }
-    }
   }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-900 text-white font-sans flex flex-col">
-    
-
       {/* HEADER */}
+      <AdBanner />
       <header className="w-full flex justify-between items-center p-6 border-b border-white/10 bg-white/5 backdrop-blur shadow-md">
         <h1 className="text-xl sm:text-3xl font-extrabold bg-gradient-to-r from-fuchsia-500 to-cyan-400 text-transparent bg-clip-text">
           🎬 CinéSync – Le cinéma ensemble, même à distance
@@ -160,28 +152,17 @@ export default function Dashboard() {
               </ul>
 
               <div className="bg-cyan-600/10 p-4 rounded-xl text-sm text-cyan-300 mt-4">
-                <strong>Plus besoin de dire :</strong>{" "}
+                 <strong>Plus besoin de dire :</strong>{" "}
                 <em>« T'appuies sur lecture maintenant ? »</em>
                 <br />
                 CinéSync synchronise automatiquement la vidéo sur tous les
                 écrans.
               </div>
 
-              {/* 📢 Bloc PUBLICITAIRE ici */}
-              <div className="my-8">
-                <ins
-                  className="adsbygoogle"
-                  style={{ display: "block", textAlign: "center" }}
-                  data-ad-client="ca-pub-7819050999307874"
-                  data-ad-slot="1234567890"
-                  data-ad-format="auto"
-                  data-full-width-responsive="true"
-                ></ins>
-              </div>
-
               <div className="text-sm text-gray-400 mt-6 italic">
                 💡 Plateforme en version bêta – Testez, invitez, et amusez-vous
-                librement !<br />
+                librement !
+                <br />
                 Créée avec ❤️ par{" "}
                 <span className="text-white font-bold">BELGHIETI MOHAMED</span>
               </div>
@@ -192,8 +173,8 @@ export default function Dashboard() {
 
       {/* FOOTER */}
       <footer className="text-center text-xs text-gray-500 py-4 border-t border-white/10">
-        🎥 CinéSync - Une soirée cinéma en ligne avec vos amis. MADE with ❤️ by
-        BELGHIETI MOHAMED | Beta version.
+        🎥 CinéSync - Une soirée cinéma en ligne avec vos amis.
+        MADE with ❤️ by BELGHIETI MOHAMED | Beta version.
       </footer>
     </div>
   );
