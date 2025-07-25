@@ -15,9 +15,10 @@ export default function AddMovieForm({ onMovieAdded }) {
       setError("Token manquant, veuillez vous reconnecter.");
       return;
     }
+     console.log("token:", token);
+
 
     try {
-      console.log("token:", token);
       const res = await fetch(`${baseUrl}/api/movies`, {
         method: "POST",
         headers: {
