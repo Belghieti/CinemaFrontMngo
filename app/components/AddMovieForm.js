@@ -17,6 +17,7 @@ export default function AddMovieForm({ onMovieAdded }) {
     }
 
     try {
+      console.log("token:", token);
       const res = await fetch(`${baseUrl}/api/movies`, {
         method: "POST",
         headers: {
