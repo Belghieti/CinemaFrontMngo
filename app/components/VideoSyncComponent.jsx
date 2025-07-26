@@ -126,6 +126,8 @@ export default function VideoSyncComponent({ boxId }) {
 
   if (error) return <p style={{ color: "red" }}>{error}</p>;
   if (!boxInfo) return <p>Chargement...</p>;
+  const videoUrl = boxInfo.movie?.videoUrl || "";
+  const isHLS = videoUrl.includes(".m3u8");
 
   return (
     <div style={{ padding: 20 }}>
@@ -149,7 +151,10 @@ export default function VideoSyncComponent({ boxId }) {
           width="100%"
           config={{
             file: {
-              forceHLS: true,
+              forceHLS: isHLS,
+              attributes: {
+                crossOrigin: "anonymous",
+              },
             },
           }}
         />
