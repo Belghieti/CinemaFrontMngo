@@ -278,10 +278,10 @@ export default function VideoSyncComponent({ boxId }) {
           </div>
         )}
       </div>
-  <VideoCallComponent 
-      boxId={boxInfo.id} 
-      currentUser={currentUser} 
-      stompClient={stompClient} // ⚠️ IMPORTANT: Passer votre WebSocket existant
+      <VideoCallComponent
+        boxId={boxId}
+        currentUser={currentUser}
+        stompClient={stompClient} // ⚠️ IMPORTANT: Passer votre WebSocket existant
       />
       {/* Chat and Invitations Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
