@@ -170,6 +170,53 @@ export default function BoxPage() {
         <div className="flickering-light"></div>
       </div>
 
+      {/* Animated Fireplace in Corner */}
+      <div className="fixed bottom-6 right-6 z-50 fireplace-container">
+        <div className="fireplace-frame">
+          {/* Fireplace Structure */}
+          <div className="fireplace-base"></div>
+          <div className="fireplace-back"></div>
+
+          {/* Wood Logs */}
+          <div className="log log-1"></div>
+          <div className="log log-2"></div>
+          <div className="log log-3"></div>
+
+          {/* Main Fire Flames */}
+          <div className="flame flame-1"></div>
+          <div className="flame flame-2"></div>
+          <div className="flame flame-3"></div>
+          <div className="flame flame-4"></div>
+          <div className="flame flame-5"></div>
+          <div className="flame flame-6"></div>
+
+          {/* Fire Sparks/Embers */}
+          <div className="ember ember-1"></div>
+          <div className="ember ember-2"></div>
+          <div className="ember ember-3"></div>
+          <div className="ember ember-4"></div>
+          <div className="ember ember-5"></div>
+
+          {/* Smoke Effect */}
+          <div className="smoke smoke-1"></div>
+          <div className="smoke smoke-2"></div>
+          <div className="smoke smoke-3"></div>
+
+          {/* Fire Glow Effect */}
+          <div className="fire-glow"></div>
+
+          {/* Crackling Sound Indicator */}
+          <div className="sound-waves">
+            <div className="wave wave-1"></div>
+            <div className="wave wave-2"></div>
+            <div className="wave wave-3"></div>
+          </div>
+        </div>
+
+        {/* Fireplace Light Reflection */}
+        <div className="fireplace-light"></div>
+      </div>
+
       <AdBanner />
 
       {/* HEADER */}
@@ -1222,6 +1269,393 @@ export default function BoxPage() {
           );
           border-radius: 16px;
           animation: mystical-glow 4s ease-in-out infinite;
+        }
+
+        /* Fireplace Styles */
+        .fireplace-container {
+          width: 200px;
+          height: 150px;
+          perspective: 1000px;
+        }
+
+        .fireplace-frame {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(to bottom, #2c1810, #1a0f08);
+          border-radius: 15px 15px 5px 5px;
+          border: 3px solid #8b4513;
+          box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8),
+            0 0 30px rgba(255, 69, 0, 0.3), 0 0 50px rgba(255, 69, 0, 0.1);
+          overflow: hidden;
+        }
+
+        .fireplace-base {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 20px;
+          background: linear-gradient(to top, #654321, #8b4513);
+          border-radius: 0 0 12px 12px;
+        }
+
+        .fireplace-back {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          right: 10px;
+          bottom: 20px;
+          background: linear-gradient(to bottom, #1a0f08, #0d0704);
+          border-radius: 8px;
+        }
+
+        /* Wood Logs */
+        .log {
+          position: absolute;
+          background: linear-gradient(45deg, #8b4513, #654321, #4a2c17);
+          border-radius: 20px;
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .log-1 {
+          bottom: 25px;
+          left: 20px;
+          width: 60px;
+          height: 12px;
+          transform: rotate(-5deg);
+        }
+
+        .log-2 {
+          bottom: 30px;
+          right: 25px;
+          width: 50px;
+          height: 10px;
+          transform: rotate(8deg);
+        }
+
+        .log-3 {
+          bottom: 40px;
+          left: 35px;
+          width: 45px;
+          height: 8px;
+          transform: rotate(-3deg);
+        }
+
+        /* Fire Flames Animation */
+        @keyframes flame-dance {
+          0%,
+          100% {
+            transform: scaleY(1) scaleX(1) rotate(-2deg);
+            opacity: 0.9;
+          }
+          25% {
+            transform: scaleY(1.3) scaleX(0.8) rotate(3deg);
+            opacity: 1;
+          }
+          50% {
+            transform: scaleY(0.8) scaleX(1.2) rotate(-4deg);
+            opacity: 0.8;
+          }
+          75% {
+            transform: scaleY(1.4) scaleX(0.7) rotate(2deg);
+            opacity: 1;
+          }
+        }
+
+        .flame {
+          position: absolute;
+          bottom: 35px;
+          background: radial-gradient(
+            ellipse at bottom,
+            #ff4500 0%,
+            #ff6347 30%,
+            #ff8c00 60%,
+            #ffd700 80%,
+            transparent 100%
+          );
+          border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+          filter: blur(1px);
+          animation: flame-dance ease-in-out infinite;
+        }
+
+        .flame-1 {
+          left: 30px;
+          width: 25px;
+          height: 50px;
+          animation-duration: 1.5s;
+          animation-delay: 0s;
+        }
+
+        .flame-2 {
+          left: 50px;
+          width: 35px;
+          height: 65px;
+          animation-duration: 1.8s;
+          animation-delay: 0.3s;
+        }
+
+        .flame-3 {
+          right: 40px;
+          width: 30px;
+          height: 55px;
+          animation-duration: 1.6s;
+          animation-delay: 0.6s;
+        }
+
+        .flame-4 {
+          right: 60px;
+          width: 20px;
+          height: 40px;
+          animation-duration: 1.4s;
+          animation-delay: 0.9s;
+        }
+
+        .flame-5 {
+          left: 70px;
+          width: 28px;
+          height: 48px;
+          animation-duration: 1.7s;
+          animation-delay: 1.2s;
+        }
+
+        .flame-6 {
+          right: 25px;
+          width: 15px;
+          height: 35px;
+          animation-duration: 1.3s;
+          animation-delay: 1.5s;
+        }
+
+        /* Fire Embers/Sparks */
+        @keyframes ember-float {
+          0% {
+            transform: translateY(0) translateX(0) scale(1);
+            opacity: 1;
+          }
+          50% {
+            transform: translateY(-30px) translateX(10px) scale(0.5);
+            opacity: 0.7;
+          }
+          100% {
+            transform: translateY(-60px) translateX(-5px) scale(0);
+            opacity: 0;
+          }
+        }
+
+        .ember {
+          position: absolute;
+          width: 3px;
+          height: 3px;
+          background: radial-gradient(circle, #ff4500, #ff8c00);
+          border-radius: 50%;
+          animation: ember-float ease-out infinite;
+        }
+
+        .ember-1 {
+          bottom: 60px;
+          left: 40px;
+          animation-duration: 3s;
+          animation-delay: 0s;
+        }
+
+        .ember-2 {
+          bottom: 70px;
+          right: 50px;
+          animation-duration: 3.5s;
+          animation-delay: 1s;
+        }
+
+        .ember-3 {
+          bottom: 65px;
+          left: 80px;
+          animation-duration: 2.8s;
+          animation-delay: 2s;
+        }
+
+        .ember-4 {
+          bottom: 55px;
+          right: 70px;
+          animation-duration: 3.2s;
+          animation-delay: 0.5s;
+        }
+
+        .ember-5 {
+          bottom: 75px;
+          left: 60px;
+          animation-duration: 2.9s;
+          animation-delay: 1.5s;
+        }
+
+        /* Smoke Effect */
+        @keyframes smoke-rise {
+          0% {
+            transform: translateY(0) translateX(0) scale(0.5);
+            opacity: 0.6;
+          }
+          50% {
+            transform: translateY(-40px) translateX(15px) scale(1);
+            opacity: 0.3;
+          }
+          100% {
+            transform: translateY(-80px) translateX(-10px) scale(1.5);
+            opacity: 0;
+          }
+        }
+
+        .smoke {
+          position: absolute;
+          width: 20px;
+          height: 20px;
+          background: radial-gradient(
+            circle,
+            rgba(128, 128, 128, 0.4),
+            transparent
+          );
+          border-radius: 50%;
+          filter: blur(3px);
+          animation: smoke-rise ease-out infinite;
+        }
+
+        .smoke-1 {
+          top: 20px;
+          left: 60px;
+          animation-duration: 4s;
+          animation-delay: 0s;
+        }
+
+        .smoke-2 {
+          top: 15px;
+          right: 55px;
+          animation-duration: 4.5s;
+          animation-delay: 1.5s;
+        }
+
+        .smoke-3 {
+          top: 25px;
+          left: 80px;
+          animation-duration: 4.2s;
+          animation-delay: 3s;
+        }
+
+        /* Fire Glow Effect */
+        @keyframes fire-glow {
+          0%,
+          100% {
+            opacity: 0.6;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.9;
+            transform: scale(1.1);
+          }
+        }
+
+        .fire-glow {
+          position: absolute;
+          bottom: 20px;
+          left: 20px;
+          right: 20px;
+          height: 60px;
+          background: radial-gradient(
+            ellipse at center bottom,
+            rgba(255, 69, 0, 0.3) 0%,
+            rgba(255, 140, 0, 0.2) 40%,
+            transparent 80%
+          );
+          border-radius: 50%;
+          animation: fire-glow 2s ease-in-out infinite;
+          filter: blur(2px);
+        }
+
+        /* Sound Waves Effect */
+        @keyframes sound-wave {
+          0% {
+            transform: scale(0);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(3);
+            opacity: 0;
+          }
+        }
+
+        .sound-waves {
+          position: absolute;
+          top: -10px;
+          right: -10px;
+          width: 20px;
+          height: 20px;
+        }
+
+        .wave {
+          position: absolute;
+          width: 6px;
+          height: 6px;
+          border: 1px solid rgba(255, 215, 0, 0.6);
+          border-radius: 50%;
+          animation: sound-wave 2s ease-out infinite;
+        }
+
+        .wave-1 {
+          animation-delay: 0s;
+        }
+
+        .wave-2 {
+          animation-delay: 0.7s;
+        }
+
+        .wave-3 {
+          animation-delay: 1.4s;
+        }
+
+        /* Fireplace Light Reflection */
+        @keyframes fireplace-light {
+          0%,
+          100% {
+            opacity: 0.1;
+            transform: scale(1);
+          }
+          25% {
+            opacity: 0.3;
+            transform: scale(1.2);
+          }
+          50% {
+            opacity: 0.2;
+            transform: scale(0.9);
+          }
+          75% {
+            opacity: 0.4;
+            transform: scale(1.1);
+          }
+        }
+
+        .fireplace-light {
+          position: absolute;
+          bottom: -20px;
+          right: -30px;
+          width: 250px;
+          height: 200px;
+          background: radial-gradient(
+            ellipse at center,
+            rgba(255, 140, 0, 0.1) 0%,
+            rgba(255, 69, 0, 0.05) 40%,
+            transparent 70%
+          );
+          border-radius: 50%;
+          animation: fireplace-light 3s ease-in-out infinite;
+          pointer-events: none;
+          z-index: -1;
+        }
+
+        /* Enhanced Fireplace Responsiveness */
+        @media (max-width: 768px) {
+          .fireplace-container {
+            width: 150px;
+            height: 112px;
+            bottom: 4px;
+            right: 4px;
+          }
         }
       `}</style>
     </div>
