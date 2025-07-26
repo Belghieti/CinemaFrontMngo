@@ -4,6 +4,7 @@ export default function VideoCallComponent({
   boxId,
   currentUser,
   stompClient: existingStompClient,
+  isWebSocketConnected,
 }) {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -28,9 +29,22 @@ export default function VideoCallComponent({
 
   // Utiliser le WebSocket existant au lieu d'en créer un nouveau
   useEffect(() => {
-    if (!existingStompClient?.current?.connected) return;
+    // ⚠️ ATTENDRE que tout soit prêt
+    if (
+      !existingStompClient?.current?.connected ||
+      !isWebSocketConnected ||
+      !currentUser
+    ) {
+      console.log("⏳ En attente de la connexion WebSocket...", {
+        client: !!existingStompClient?.current,
+        connected: existingStompClient?.current?.connected,
+        wsState: isWebSocketConnected,
+        user: !!currentUser,
+      });
+      return;
+    }
 
-    console.log("Configuration des abonnements appel vidéo");
+    console.log("✅ Configuration des abonnements appel vidéo");
 
     // S'abonner aux signaux WebRTC
     const videoCallSub = existingStompClient.current.subscribe(
@@ -55,7 +69,12 @@ export default function VideoCallComponent({
       callUsersSub.unsubscribe();
       endCall();
     };
-  }, [boxId, existingStompClient?.current?.connected]);
+  }, [
+    boxId,
+    existingStompClient?.current?.connected,
+    isWebSocketConnected,
+    currentUser,
+  ]);
 
   const handleCallUsersUpdate = (data) => {
     console.log("Mise à jour des utilisateurs en appel:", data);
@@ -380,7 +399,10 @@ export default function VideoCallComponent({
       <div className="text-xs text-gray-500 bg-gray-800/50 p-2 rounded">
         Participants: {callParticipants.size} | Initiateur:{" "}
         {isInitiator.current ? "Oui" : "Non"} | WebSocket:{" "}
-        {existingStompClient?.current?.connected ? "✅" : "❌"}
+        {existingStompClient?.current?.connected && isWebSocketConnected
+          ? "✅"
+          : "❌"}{" "}
+        | User: {currentUser ? "✅" : "❌"}
       </div>
 
       {/* Error Display */}

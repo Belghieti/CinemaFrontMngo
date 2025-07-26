@@ -30,7 +30,7 @@ export default function VideoSyncComponent({ boxId }) {
     })
       .then((res) => res.json())
       .then((user) => {
-        setCurrentUser(user); // Stocker les infos de l'utilisateur actuel
+        setCurrentUser(user);
         fetch(
           `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}?userId=${user.id}`,
           {
@@ -55,8 +55,10 @@ export default function VideoSyncComponent({ boxId }) {
       brokerURL: `wss://cinemamongo-production.up.railway.app/ws`,
       reconnectDelay: 5000,
       onConnect: () => {
+        console.log("✅ WebSocket connecté dans VideoSyncComponent");
         setConnected(true);
 
+        // Abonnements existants
         client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
           const videoMessage = JSON.parse(msg.body);
           suppressEvent.current = true;
@@ -79,6 +81,10 @@ export default function VideoSyncComponent({ boxId }) {
         client.subscribe(`/topic/box/${boxId}/invitations`, (msg) => {
           setInvitations((prev) => [...prev, JSON.parse(msg.body)]);
         });
+      },
+      onDisconnect: () => {
+        console.log("❌ WebSocket déconnecté");
+        setConnected(false);
       },
     });
 
@@ -123,8 +129,8 @@ export default function VideoSyncComponent({ boxId }) {
     stompClient.current.publish({
       destination: `/app/box/${boxId}/chat`,
       body: JSON.stringify({
-        sender: currentUser.username, // Utiliser le vrai nom d'utilisateur
-        senderId: currentUser.id, // Ajouter l'ID pour identification
+        sender: currentUser.username,
+        senderId: currentUser.id,
         content: newMessage,
       }),
     });
@@ -278,11 +284,24 @@ export default function VideoSyncComponent({ boxId }) {
           </div>
         )}
       </div>
-      <VideoCallComponent
-        boxId={boxId}
-        currentUser={currentUser}
-        stompClient={stompClient} // ⚠️ IMPORTANT: Passer votre WebSocket existant
-      />
+
+      {/* ✅ APPEL VIDÉO : Ne s'affiche que quand tout est prêt */}
+      {connected && currentUser && (
+        <VideoCallComponent
+          boxId={boxId}
+          currentUser={currentUser}
+          stompClient={stompClient}
+          isWebSocketConnected={connected} // ⚠️ NOUVEAU: Passer l'état de connexion
+        />
+      )}
+
+      {/* Debug Info - À supprimer après test */}
+      <div className="bg-gray-800/50 p-3 rounded-xl text-xs text-gray-400">
+        <strong>Debug:</strong> WebSocket: {connected ? "✅" : "❌"} | User:{" "}
+        {currentUser ? "✅" : "❌"} | Client:{" "}
+        {stompClient.current ? "✅" : "❌"}
+      </div>
+
       {/* Chat and Invitations Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chat Section */}
