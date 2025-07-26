@@ -138,7 +138,7 @@ export default function VideoSyncComponent({ boxId }) {
           //url={boxInfo.movie.videoUrl} // ✅ Lien vidéo dynamique ici !
           // url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrvzui5bgeyf3tkumpyb6awnva3dsynqgsg5ht2dqoxltkboulpsmxmmm4wintkjh2b5vfj/Angel__x27_s.Last_Mission._Love.S01.E06.720p.WeCima.Show.mp4"
           // url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrvzui5bgeyf3tkumpyb6awnva3dsynqgsg5ht2dqoxltkbovtrvsdlu7twccqcyln2ooie/Angel__x27_s.Last_Mission._Love.S01.E06.720p.WeCima.Show.mp4"
-          url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrv5ui5bgeyf3tkump5hkqxo3fpkffmgxs3jq4wvxubzw546lcd456qckbh76dc4nhotsdy/Angel__x27_s.Last_Mission._Love.S01.E08.720p.WeCima.Show.mp4"
+          url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrv7ui5bgeyf3tkumpyrkynni5rqr4tvt7rd53alexzguogrmyc5bax7zn64cvyn27hryv4/Angel__x27_s.Last_Mission._Love.S01.E09.720p.WeCima.Show.mp4"
           playing={playing}
           controls
           onPlay={handlePlay}
