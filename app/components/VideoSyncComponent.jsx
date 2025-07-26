@@ -9,7 +9,8 @@ export default function VideoSyncComponent({ boxId }) {
   const invitContainerRef = useRef(null);
   const suppressEvent = useRef(false);
   const seekTimeout = useRef(null);
-  const lastAction = useRef(null); // Pour éviter les boucles
+  const lastAction = useRef(null);
+  const actionTimeout = useRef(null); // Nouveau timeout pour les actions
 
   const [connected, setConnected] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -60,23 +61,30 @@ export default function VideoSyncComponent({ boxId }) {
         client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
           const videoMessage = JSON.parse(msg.body);
 
-          // Marquer que nous recevons un événement externe
-          suppressEvent.current = true;
-          lastAction.current = videoMessage.action;
+          console.log(
+            "Message reçu:",
+            videoMessage.action,
+            "suppressEvent:",
+            suppressEvent.current
+          );
 
-          if (videoMessage.action === "play") {
-            setPlaying(true);
-          } else if (videoMessage.action === "pause") {
-            setPlaying(false);
-          } else if (videoMessage.action === "seek" && playerRef.current) {
-            playerRef.current.seekTo(videoMessage.time || 0);
+          // Ne traiter le message que si on n'est pas en train de supprimer les événements
+          if (!suppressEvent.current) {
+            suppressEvent.current = true;
+
+            if (videoMessage.action === "play") {
+              setPlaying(true);
+            } else if (videoMessage.action === "pause") {
+              setPlaying(false);
+            } else if (videoMessage.action === "seek" && playerRef.current) {
+              playerRef.current.seekTo(videoMessage.time || 0);
+            }
+
+            // Libérer après un délai
+            setTimeout(() => {
+              suppressEvent.current = false;
+            }, 800);
           }
-
-          // Libérer après un délai
-          setTimeout(() => {
-            suppressEvent.current = false;
-            lastAction.current = null;
-          }, 1000); // Augmenté à 1 seconde
         });
 
         client.subscribe(`/topic/box/${boxId}/chat`, (msg) => {
@@ -91,41 +99,58 @@ export default function VideoSyncComponent({ boxId }) {
 
     client.activate();
     stompClient.current = client;
-    return () => client.deactivate();
+    return () => {
+      clearTimeout(seekTimeout.current);
+      clearTimeout(actionTimeout.current);
+      client.deactivate();
+    };
   }, [boxInfo]);
 
   const sendVideoAction = (action, time = null) => {
     if (!stompClient.current?.connected || suppressEvent.current) return;
-
-    // Éviter d'envoyer la même action répétitivement
-    if (lastAction.current === action) return;
 
     const body = { action };
     if (time !== null) body.time = time;
 
     console.log("Envoi action:", action, time); // Pour debug
 
+    // Marquer qu'on envoie une action pour éviter de la recevoir
+    suppressEvent.current = true;
+    lastAction.current = action;
+
     stompClient.current.publish({
       destination: `/app/box/${boxId}/video-sync`,
       body: JSON.stringify(body),
     });
 
-    lastAction.current = action;
+    // Libérer après un court délai
+    setTimeout(() => {
+      suppressEvent.current = false;
+      lastAction.current = null;
+    }, 500);
   };
 
   const handlePlay = () => {
     console.log("handlePlay déclenché, suppressEvent:", suppressEvent.current);
     if (!suppressEvent.current) {
-      setPlaying(true);
-      sendVideoAction("play");
+      // Debounce pour éviter les clics multiples rapides
+      clearTimeout(actionTimeout.current);
+      actionTimeout.current = setTimeout(() => {
+        setPlaying(true);
+        sendVideoAction("play");
+      }, 100);
     }
   };
 
   const handlePause = () => {
     console.log("handlePause déclenché, suppressEvent:", suppressEvent.current);
     if (!suppressEvent.current) {
-      setPlaying(false);
-      sendVideoAction("pause");
+      // Debounce pour éviter les clics multiples rapides
+      clearTimeout(actionTimeout.current);
+      actionTimeout.current = setTimeout(() => {
+        setPlaying(false);
+        sendVideoAction("pause");
+      }, 100);
     }
   };
 
