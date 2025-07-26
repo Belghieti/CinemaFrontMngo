@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Client } from "@stomp/stompjs";
 
-export default function VideoCallComponent({ boxId, currentUser }) {
+export default function VideoCallComponent({
+  boxId,
+  currentUser,
+  stompClient: existingStompClient,
+}) {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnection = useRef(null);
-  const stompClient = useRef(null);
   const localStream = useRef(null);
+  const isInitiator = useRef(false);
 
   const [isCallActive, setIsCallActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -14,7 +17,7 @@ export default function VideoCallComponent({ boxId, currentUser }) {
   const [error, setError] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
-  const [connectedUsers, setConnectedUsers] = useState([]);
+  const [callParticipants, setCallParticipants] = useState(new Set());
 
   const ICE_SERVERS = {
     iceServers: [
@@ -23,44 +26,63 @@ export default function VideoCallComponent({ boxId, currentUser }) {
     ],
   };
 
-  // Initialisation WebSocket STOMP
+  // Utiliser le WebSocket existant au lieu d'en créer un nouveau
   useEffect(() => {
-    const client = new Client({
-      brokerURL: "wss://cinemamongo-production.up.railway.app/ws",
-      reconnectDelay: 5000,
-      onConnect: () => {
-        console.log("WebSocket connecté pour l'appel vidéo");
+    if (!existingStompClient?.current?.connected) return;
 
-        // S'abonner aux signaux WebRTC
-        client.subscribe(`/topic/box/${boxId}/video-call`, (message) => {
-          const data = JSON.parse(message.body);
-          handleSignal(data);
-        });
+    console.log("Configuration des abonnements appel vidéo");
 
-        // S'abonner aux événements d'utilisateurs
-        client.subscribe(`/topic/box/${boxId}/call-users`, (message) => {
-          const users = JSON.parse(message.body);
-          setConnectedUsers(users);
-          setRemoteUserConnected(users.length > 1);
-        });
-      },
-      onDisconnect: () => {
-        console.log("WebSocket déconnecté");
-        setRemoteUserConnected(false);
-      },
-    });
+    // S'abonner aux signaux WebRTC
+    const videoCallSub = existingStompClient.current.subscribe(
+      `/topic/box/${boxId}/video-call`,
+      (message) => {
+        const data = JSON.parse(message.body);
+        handleSignal(data);
+      }
+    );
 
-    client.activate();
-    stompClient.current = client;
+    // S'abonner aux événements d'utilisateurs en appel
+    const callUsersSub = existingStompClient.current.subscribe(
+      `/topic/box/${boxId}/call-users`,
+      (message) => {
+        const data = JSON.parse(message.body);
+        handleCallUsersUpdate(data);
+      }
+    );
 
     return () => {
-      client.deactivate();
+      videoCallSub.unsubscribe();
+      callUsersSub.unsubscribe();
       endCall();
     };
-  }, [boxId]);
+  }, [boxId, existingStompClient?.current?.connected]);
+
+  const handleCallUsersUpdate = (data) => {
+    console.log("Mise à jour des utilisateurs en appel:", data);
+
+    if (data.type === "user-joined" && data.userId !== currentUser?.id) {
+      setCallParticipants((prev) => new Set([...prev, data.userId]));
+
+      // Si on est déjà en appel et qu'un nouvel utilisateur rejoint, on devient l'initiateur
+      if (isCallActive && !isInitiator.current) {
+        isInitiator.current = true;
+        setTimeout(() => createOffer(), 1000); // Délai pour laisser l'autre s'initialiser
+      }
+    } else if (data.type === "user-left") {
+      setCallParticipants((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(data.userId);
+        return newSet;
+      });
+
+      if (data.userId !== currentUser?.id) {
+        handleRemoteUserLeft();
+      }
+    }
+  };
 
   const sendSignal = (data) => {
-    if (!stompClient.current?.connected) {
+    if (!existingStompClient?.current?.connected) {
       console.error("WebSocket non connecté");
       return;
     }
@@ -71,18 +93,31 @@ export default function VideoCallComponent({ boxId, currentUser }) {
       username: currentUser?.username,
     };
 
-    stompClient.current.publish({
+    existingStompClient.current.publish({
       destination: `/app/box/${boxId}/video-call`,
       body: JSON.stringify(signalWithUser),
     });
   };
 
   const notifyUserJoined = () => {
-    if (stompClient.current?.connected) {
-      stompClient.current.publish({
+    if (existingStompClient?.current?.connected) {
+      existingStompClient.current.publish({
         destination: `/app/box/${boxId}/call-users`,
         body: JSON.stringify({
           type: "user-joined",
+          userId: currentUser?.id,
+          username: currentUser?.username,
+        }),
+      });
+    }
+  };
+
+  const notifyUserLeft = () => {
+    if (existingStompClient?.current?.connected) {
+      existingStompClient.current.publish({
+        destination: `/app/box/${boxId}/call-users`,
+        body: JSON.stringify({
+          type: "user-left",
           userId: currentUser?.id,
           username: currentUser?.username,
         }),
@@ -114,6 +149,12 @@ export default function VideoCallComponent({ boxId, currentUser }) {
 
       // Notifier qu'un utilisateur a rejoint
       notifyUserJoined();
+
+      // Si il y a déjà des participants, on devient l'initiateur
+      if (callParticipants.size > 0) {
+        isInitiator.current = true;
+        setTimeout(() => createOffer(), 1000);
+      }
 
       console.log("Appel démarré avec succès");
     } catch (err) {
@@ -163,18 +204,26 @@ export default function VideoCallComponent({ boxId, currentUser }) {
         setRemoteUserConnected(false);
       }
     };
+  };
 
-    // Créer une offre si c'est le premier utilisateur
-    if (connectedUsers.length === 0) {
+  const createOffer = async () => {
+    if (!peerConnection.current) return;
+
+    try {
+      console.log("Création d'une offre...");
       const offer = await peerConnection.current.createOffer();
       await peerConnection.current.setLocalDescription(offer);
       sendSignal({ type: "offer", offer });
+    } catch (err) {
+      console.error("Erreur lors de la création de l'offre:", err);
     }
   };
 
   const handleSignal = async (data) => {
     // Ignorer ses propres signaux
     if (data.userId === currentUser?.id) return;
+
+    console.log("Signal reçu:", data.type, "de", data.username);
 
     try {
       switch (data.type) {
@@ -191,6 +240,7 @@ export default function VideoCallComponent({ boxId, currentUser }) {
           await peerConnection.current.setLocalDescription(answer);
 
           sendSignal({ type: "answer", answer });
+          console.log("Réponse envoyée");
           break;
 
         case "answer":
@@ -198,6 +248,7 @@ export default function VideoCallComponent({ boxId, currentUser }) {
             await peerConnection.current.setRemoteDescription(
               new RTCSessionDescription(data.answer)
             );
+            console.log("Réponse reçue et appliquée");
           }
           break;
 
@@ -210,6 +261,7 @@ export default function VideoCallComponent({ boxId, currentUser }) {
               await peerConnection.current.addIceCandidate(
                 new RTCIceCandidate(data.candidate)
               );
+              console.log("ICE candidate ajouté");
             } catch (err) {
               console.error("Erreur ICE candidate:", err);
             }
@@ -217,16 +269,26 @@ export default function VideoCallComponent({ boxId, currentUser }) {
           break;
 
         case "user-left":
-          setRemoteUserConnected(false);
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = null;
-          }
+          handleRemoteUserLeft();
           break;
       }
     } catch (err) {
       console.error("Erreur lors du traitement du signal:", err);
       setError("Erreur de connexion");
     }
+  };
+
+  const handleRemoteUserLeft = () => {
+    setRemoteUserConnected(false);
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    // Réinitialiser la connexion peer pour une nouvelle connexion
+    if (peerConnection.current) {
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
+    isInitiator.current = false;
   };
 
   const toggleMute = () => {
@@ -251,9 +313,7 @@ export default function VideoCallComponent({ boxId, currentUser }) {
 
   const endCall = () => {
     // Notifier la déconnexion
-    if (stompClient.current?.connected) {
-      sendSignal({ type: "user-left" });
-    }
+    notifyUserLeft();
 
     // Fermer la connexion peer
     if (peerConnection.current) {
@@ -280,6 +340,8 @@ export default function VideoCallComponent({ boxId, currentUser }) {
     setIsMuted(false);
     setIsVideoOff(false);
     setError(null);
+    setCallParticipants(new Set());
+    isInitiator.current = false;
   };
 
   return (
@@ -293,7 +355,11 @@ export default function VideoCallComponent({ boxId, currentUser }) {
           <div>
             <h3 className="text-xl font-bold text-red-400">Appel Vidéo</h3>
             <p className="text-sm text-gray-400">
-              {remoteUserConnected ? "Connecté" : "En attente..."}
+              {remoteUserConnected
+                ? "Connecté"
+                : callParticipants.size > 0
+                ? "Connexion en cours..."
+                : "En attente..."}
             </p>
           </div>
         </div>
@@ -308,6 +374,13 @@ export default function VideoCallComponent({ boxId, currentUser }) {
             {isCallActive ? "Actif" : "Inactif"}
           </span>
         </div>
+      </div>
+
+      {/* Debug Info */}
+      <div className="text-xs text-gray-500 bg-gray-800/50 p-2 rounded">
+        Participants: {callParticipants.size} | Initiateur:{" "}
+        {isInitiator.current ? "Oui" : "Non"} | WebSocket:{" "}
+        {existingStompClient?.current?.connected ? "✅" : "❌"}
       </div>
 
       {/* Error Display */}
@@ -370,7 +443,9 @@ export default function VideoCallComponent({ boxId, currentUser }) {
               <div className="text-center">
                 <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-gray-300 text-sm">
-                  En attente d'un autre utilisateur...
+                  {callParticipants.size > 0
+                    ? "Connexion avec l'autre utilisateur..."
+                    : "En attente d'un autre utilisateur..."}
                 </p>
               </div>
             </div>
@@ -390,7 +465,11 @@ export default function VideoCallComponent({ boxId, currentUser }) {
         {!isCallActive ? (
           <button
             onClick={startCall}
-            disabled={isConnecting || !currentUser}
+            disabled={
+              isConnecting ||
+              !currentUser ||
+              !existingStompClient?.current?.connected
+            }
             className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-green-500/25 hover:scale-105 active:scale-95 flex items-center space-x-2"
           >
             {isConnecting ? (
@@ -515,7 +594,7 @@ export default function VideoCallComponent({ boxId, currentUser }) {
           <p className="text-gray-400 text-sm">
             {remoteUserConnected
               ? "🟢 Appel en cours avec un autre participant"
-              : "🟡 En attente d'autres participants..."}
+              : `🟡 ${callParticipants.size} participant(s) détecté(s), connexion en cours...`}
           </p>
         </div>
       )}
