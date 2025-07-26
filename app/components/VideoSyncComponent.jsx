@@ -147,8 +147,7 @@ export default function VideoSyncComponent({ boxId }) {
           width="100%"
           config={{
             file: {
-              
-              forceHLS: false,
+              forceHLS: true,
               hlsOptions: {
                 liveSyncDurationCount: 3,
                 maxBufferLength: 30,
