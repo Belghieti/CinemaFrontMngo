@@ -9,6 +9,7 @@ export default function VideoSyncComponent({ boxId }) {
   const invitContainerRef = useRef(null);
   const suppressEvent = useRef(false);
   const seekTimeout = useRef(null);
+  const lastSyncTime = useRef(0);
 
   const [connected, setConnected] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -18,6 +19,76 @@ export default function VideoSyncComponent({ boxId }) {
   const [boxInfo, setBoxInfo] = useState(null);
   const [error, setError] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isHost, setIsHost] = useState(false);
+
+  // Fonction pour détecter le type de vidéo et optimiser la configuration
+  const getVideoConfig = (url) => {
+    if (!url) return {};
+
+    const urlLower = url.toLowerCase();
+
+    // Configuration spécifique selon le type de fichier
+    if (urlLower.includes("youtube.com") || urlLower.includes("youtu.be")) {
+      return {
+        youtube: {
+          playerVars: {
+            showinfo: 0,
+            controls: 1,
+            disablekb: 0,
+            enablejsapi: 1,
+            fs: 1,
+            modestbranding: 1,
+            rel: 0,
+            iv_load_policy: 3,
+          },
+        },
+      };
+    } else if (urlLower.includes(".m3u8")) {
+      return {
+        file: {
+          forceHLS: true,
+          forceVideo: true,
+          attributes: {
+            crossOrigin: "anonymous",
+            controlsList: "nodownload",
+            preload: "metadata",
+          },
+        },
+      };
+    } else if (
+      urlLower.includes(".mp4") ||
+      urlLower.includes(".webm") ||
+      urlLower.includes(".ogg") ||
+      urlLower.includes(".mov")
+    ) {
+      return {
+        file: {
+          forceVideo: true,
+          forceHLS: false,
+          attributes: {
+            crossOrigin: "anonymous",
+            controlsList: "nodownload",
+            preload: "metadata",
+            playsInline: true,
+          },
+        },
+      };
+    } else {
+      // Configuration générale pour autres formats
+      return {
+        file: {
+          forceVideo: true,
+          attributes: {
+            crossOrigin: "anonymous",
+            controlsList: "nodownload",
+            preload: "metadata",
+            playsInline: true,
+          },
+        },
+      };
+    }
+  };
 
   // Récupération de la box + film
   useEffect(() => {
@@ -29,7 +100,7 @@ export default function VideoSyncComponent({ boxId }) {
     })
       .then((res) => res.json())
       .then((user) => {
-        setCurrentUser(user); // Stocker les infos de l'utilisateur actuel
+        setCurrentUser(user);
         fetch(
           `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}?userId=${user.id}`,
           {
@@ -40,56 +111,153 @@ export default function VideoSyncComponent({ boxId }) {
           }
         )
           .then((res) => res.json())
-          .then(setBoxInfo)
+          .then((boxData) => {
+            setBoxInfo(boxData);
+            // Vérifier si l'utilisateur est le créateur
+            setIsHost(boxData.createdBy === user.id);
+          })
           .catch(() => setError("Erreur chargement de la box"));
       })
       .catch(() => setError("Erreur utilisateur"));
   }, [boxId]);
 
+  // Fonction pour demander la synchronisation
+  const requestSync = () => {
+    if (!stompClient.current?.connected || !currentUser) return;
+
+    // Envoyer une demande de synchronisation via le chat (utilisation créative du système existant)
+    stompClient.current.publish({
+      destination: `/app/box/${boxId}/chat`,
+      body: JSON.stringify({
+        sender: "SYSTEM",
+        senderId: "SYNC_REQUEST",
+        content: `SYNC_REQUEST:${currentUser.id}`,
+      }),
+    });
+  };
+
+  // Fonction pour envoyer l'état actuel
+  const sendCurrentState = () => {
+    if (!stompClient.current?.connected || !playerRef.current) return;
+
+    const currentPlayerTime = playerRef.current.getCurrentTime();
+
+    // Envoyer l'état via video-sync
+    stompClient.current.publish({
+      destination: `/app/box/${boxId}/video-sync`,
+      body: JSON.stringify({
+        action: "sync-state",
+        time: currentPlayerTime,
+        playing: playing,
+      }),
+    });
+  };
+
   // Connexion WebSocket
   useEffect(() => {
-    if (!boxInfo) return;
+    if (!boxInfo || !currentUser) return;
 
     const client = new Client({
       brokerURL: `wss://cinemamongo-production.up.railway.app/ws`,
       reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
       onConnect: () => {
         setConnected(true);
+        console.log("🟢 WebSocket connecté");
 
+        // Demander la synchronisation après connexion
+        setTimeout(() => {
+          requestSync();
+        }, 1500);
+
+        // Écouter les synchronisations vidéo
         client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
           const videoMessage = JSON.parse(msg.body);
+          console.log("📺 Message vidéo reçu:", videoMessage);
+
           suppressEvent.current = true;
 
-          if (videoMessage.action === "play") setPlaying(true);
-          else if (videoMessage.action === "pause") setPlaying(false);
-          else if (videoMessage.action === "seek" && playerRef.current) {
-            playerRef.current.seekTo(videoMessage.time || 0);
+          if (videoMessage.action === "play") {
+            setPlaying(true);
+            if (playerRef.current && videoMessage.time) {
+              playerRef.current.seekTo(videoMessage.time, "seconds");
+            }
+          } else if (videoMessage.action === "pause") {
+            setPlaying(false);
+            if (playerRef.current && videoMessage.time) {
+              playerRef.current.seekTo(videoMessage.time, "seconds");
+            }
+          } else if (videoMessage.action === "seek" && playerRef.current) {
+            const seekTime = videoMessage.time || 0;
+            playerRef.current.seekTo(seekTime, "seconds");
+            lastSyncTime.current = seekTime;
+          } else if (
+            videoMessage.action === "sync-state" &&
+            playerRef.current
+          ) {
+            // Synchroniser avec l'état reçu
+            const syncTime = videoMessage.time || 0;
+            playerRef.current.seekTo(syncTime, "seconds");
+            setPlaying(videoMessage.playing || false);
+            lastSyncTime.current = syncTime;
           }
 
           setTimeout(() => {
             suppressEvent.current = false;
-          }, 500);
+          }, 1000);
         });
 
+        // Écouter le chat (pour les demandes de sync)
         client.subscribe(`/topic/box/${boxId}/chat`, (msg) => {
-          setMessages((prev) => [...prev, JSON.parse(msg.body)]);
+          const chatMessage = JSON.parse(msg.body);
+
+          // Vérifier si c'est une demande de synchronisation
+          if (
+            chatMessage.senderId === "SYNC_REQUEST" &&
+            chatMessage.content.includes("SYNC_REQUEST:") &&
+            !chatMessage.content.includes(currentUser.id)
+          ) {
+            // Si je suis l'hôte ou si je regarde actuellement, envoyer l'état
+            if (isHost || playing || playerRef.current?.getCurrentTime() > 0) {
+              setTimeout(() => {
+                sendCurrentState();
+              }, 500);
+            }
+          } else if (chatMessage.senderId !== "SYNC_REQUEST") {
+            // Message de chat normal
+            setMessages((prev) => [...prev, chatMessage]);
+          }
         });
 
         client.subscribe(`/topic/box/${boxId}/invitations`, (msg) => {
           setInvitations((prev) => [...prev, JSON.parse(msg.body)]);
         });
       },
+      onDisconnect: () => {
+        setConnected(false);
+        console.log("🔴 WebSocket déconnecté");
+      },
+      onStompError: (frame) => {
+        console.error("❌ Erreur STOMP:", frame);
+      },
     });
 
     client.activate();
     stompClient.current = client;
-    return () => client.deactivate();
-  }, [boxInfo]);
+
+    return () => {
+      client.deactivate();
+    };
+  }, [boxInfo, currentUser, isHost, playing]);
 
   const sendVideoAction = (action, time = null) => {
     if (!stompClient.current?.connected) return;
-    const body = { action };
-    if (time !== null) body.time = time;
+
+    const currentPlayerTime = time || playerRef.current?.getCurrentTime() || 0;
+    const body = { action, time: currentPlayerTime };
+
+    console.log("📤 Envoi action vidéo:", body);
 
     stompClient.current.publish({
       destination: `/app/box/${boxId}/video-sync`,
@@ -101,18 +269,37 @@ export default function VideoSyncComponent({ boxId }) {
   };
 
   const handlePlay = () => {
-    if (!suppressEvent.current) sendVideoAction("play");
+    if (!suppressEvent.current) {
+      console.log("▶️ Play déclenché");
+      sendVideoAction("play");
+    }
   };
+
   const handlePause = () => {
-    if (!suppressEvent.current) sendVideoAction("pause");
+    if (!suppressEvent.current) {
+      console.log("⏸️ Pause déclenché");
+      sendVideoAction("pause");
+    }
   };
+
   const handleSeek = (seconds) => {
     if (!suppressEvent.current) {
+      console.log("⏩ Seek vers:", seconds);
       clearTimeout(seekTimeout.current);
       seekTimeout.current = setTimeout(() => {
         sendVideoAction("seek", seconds);
       }, 300);
     }
+  };
+
+  const handleProgress = (progress) => {
+    setCurrentTime(progress.playedSeconds);
+  };
+
+  // Fonction de synchronisation manuelle
+  const handleManualSync = () => {
+    console.log("🔄 Synchronisation manuelle demandée");
+    requestSync();
   };
 
   const sendMessage = () => {
@@ -122,14 +309,22 @@ export default function VideoSyncComponent({ boxId }) {
     stompClient.current.publish({
       destination: `/app/box/${boxId}/chat`,
       body: JSON.stringify({
-        sender: currentUser.username, // Utiliser le vrai nom d'utilisateur
-        senderId: currentUser.id, // Ajouter l'ID pour identification
+        sender: currentUser.username,
+        senderId: currentUser.id,
         content: newMessage,
       }),
     });
 
     setNewMessage("");
   };
+
+  // Auto-scroll pour les messages
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop =
+        chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   if (error) {
     return (
@@ -191,6 +386,12 @@ export default function VideoSyncComponent({ boxId }) {
                   ></div>
                   <span>{connected ? "Connecté" : "Déconnecté"}</span>
                 </div>
+                {isHost && (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <span>Hôte</span>
+                  </div>
+                )}
                 {boxInfo.movie && (
                   <div className="flex items-center space-x-2">
                     <svg
@@ -212,6 +413,28 @@ export default function VideoSyncComponent({ boxId }) {
               </div>
             </div>
           </div>
+
+          {/* Bouton de synchronisation */}
+          <button
+            onClick={handleManualSync}
+            disabled={!connected}
+            className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed px-4 py-2 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-purple-500/25 hover:scale-105 active:scale-95 flex items-center space-x-2"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            <span>Synchroniser</span>
+          </button>
         </div>
       </div>
 
@@ -223,16 +446,38 @@ export default function VideoSyncComponent({ boxId }) {
               ref={playerRef}
               url={boxInfo.movie.videoUrl}
               playing={playing}
-              controls
+              controls={true}
               onPlay={handlePlay}
               onPause={handlePause}
               onSeek={handleSeek}
+              onProgress={handleProgress}
               width="100%"
               height="100%"
-              config={{
-                file: {
-                  forceHLS: true,
-                },
+              config={getVideoConfig(boxInfo.movie.videoUrl)}
+              // Props supplémentaires pour améliorer la compatibilité
+              playsinline={true}
+              pip={false}
+              stopOnUnmount={false}
+              onReady={() => {
+                console.log("🎬 Player prêt pour:", boxInfo.movie.videoUrl);
+                console.log(
+                  "🔧 Configuration utilisée:",
+                  getVideoConfig(boxInfo.movie.videoUrl)
+                );
+              }}
+              onError={(error) => {
+                console.error("❌ Erreur player:", error);
+                console.log("🔍 URL problématique:", boxInfo.movie.videoUrl);
+                console.log(
+                  "🔧 Configuration utilisée:",
+                  getVideoConfig(boxInfo.movie.videoUrl)
+                );
+              }}
+              onBuffer={() => {
+                console.log("⏳ Mise en mémoire tampon...");
+              }}
+              onBufferEnd={() => {
+                console.log("✅ Mise en mémoire tampon terminée");
               }}
             />
             {!connected && (
