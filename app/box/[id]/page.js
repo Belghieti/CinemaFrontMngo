@@ -168,6 +168,12 @@ export default function BoxPage() {
           <p className="text-sm text-gray-400 mb-4">
             ID de la room : <code className="text-white">{box.box.id}</code>
           </p>
+          <p className="text-sm text-gray-400 mb-4">
+            Les liens valides à utiliser doivent se terminer par{" "}
+            <code>.m3u8</code>, ce qui signifie que vous devez rechercher un
+            lien vidéo dont l’URL se termine par l’extension <code>.m3u8</code>.
+          </p>
+
           <VideoSyncComponent boxId={id} />
         </div>
 
@@ -195,7 +201,6 @@ export default function BoxPage() {
                   className="flex items-center justify-between bg-white/10 p-3 rounded-lg hover:bg-white/20 transition"
                 >
                   <span className="font-medium">{user.username}</span>
-                 
                 </div>
               ))
             )}
