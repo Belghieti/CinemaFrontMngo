@@ -278,7 +278,7 @@ export default function VideoSyncComponent({ boxId }) {
           </div>
         )}
       </div>
-      <VideoCallComponent boxId={boxInfo.id} currentUser={currentUser} />
+      <VideoCallComponent boxId={boxInfo.id}  />
       {/* Chat and Invitations Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chat Section */}
