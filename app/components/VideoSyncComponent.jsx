@@ -9,6 +9,7 @@ export default function VideoSyncComponent({ boxId }) {
   const invitContainerRef = useRef(null);
   const suppressEvent = useRef(false);
   const seekTimeout = useRef(null);
+  const lastAction = useRef(null); // Pour éviter les boucles
 
   const [connected, setConnected] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -29,7 +30,7 @@ export default function VideoSyncComponent({ boxId }) {
     })
       .then((res) => res.json())
       .then((user) => {
-        setCurrentUser(user); // Stocker les infos de l'utilisateur actuel
+        setCurrentUser(user);
         fetch(
           `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}?userId=${user.id}`,
           {
@@ -58,17 +59,24 @@ export default function VideoSyncComponent({ boxId }) {
 
         client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
           const videoMessage = JSON.parse(msg.body);
-          suppressEvent.current = true;
 
-          if (videoMessage.action === "play") setPlaying(true);
-          else if (videoMessage.action === "pause") setPlaying(false);
-          else if (videoMessage.action === "seek" && playerRef.current) {
+          // Marquer que nous recevons un événement externe
+          suppressEvent.current = true;
+          lastAction.current = videoMessage.action;
+
+          if (videoMessage.action === "play") {
+            setPlaying(true);
+          } else if (videoMessage.action === "pause") {
+            setPlaying(false);
+          } else if (videoMessage.action === "seek" && playerRef.current) {
             playerRef.current.seekTo(videoMessage.time || 0);
           }
 
+          // Libérer après un délai
           setTimeout(() => {
             suppressEvent.current = false;
-          }, 500);
+            lastAction.current = null;
+          }, 1000); // Augmenté à 1 seconde
         });
 
         client.subscribe(`/topic/box/${boxId}/chat`, (msg) => {
@@ -87,32 +95,57 @@ export default function VideoSyncComponent({ boxId }) {
   }, [boxInfo]);
 
   const sendVideoAction = (action, time = null) => {
-    if (!stompClient.current?.connected) return;
+    if (!stompClient.current?.connected || suppressEvent.current) return;
+
+    // Éviter d'envoyer la même action répétitivement
+    if (lastAction.current === action) return;
+
     const body = { action };
     if (time !== null) body.time = time;
+
+    console.log("Envoi action:", action, time); // Pour debug
 
     stompClient.current.publish({
       destination: `/app/box/${boxId}/video-sync`,
       body: JSON.stringify(body),
     });
 
-    if (action === "play") setPlaying(true);
-    if (action === "pause") setPlaying(false);
+    lastAction.current = action;
   };
 
   const handlePlay = () => {
-    if (!suppressEvent.current) sendVideoAction("play");
+    console.log("handlePlay déclenché, suppressEvent:", suppressEvent.current);
+    if (!suppressEvent.current) {
+      setPlaying(true);
+      sendVideoAction("play");
+    }
   };
+
   const handlePause = () => {
-    if (!suppressEvent.current) sendVideoAction("pause");
+    console.log("handlePause déclenché, suppressEvent:", suppressEvent.current);
+    if (!suppressEvent.current) {
+      setPlaying(false);
+      sendVideoAction("pause");
+    }
   };
+
   const handleSeek = (seconds) => {
     if (!suppressEvent.current) {
       clearTimeout(seekTimeout.current);
       seekTimeout.current = setTimeout(() => {
         sendVideoAction("seek", seconds);
-      }, 300);
+      }, 500); // Augmenté le délai
     }
+  };
+
+  // Nouvelle fonction pour gérer les changements d'état du player
+  const handleProgress = (state) => {
+    // Cette fonction peut être utilisée pour synchroniser le temps si nécessaire
+  };
+
+  // Fonction pour gérer le ready du player
+  const handleReady = () => {
+    console.log("Player ready");
   };
 
   const sendMessage = () => {
@@ -122,8 +155,8 @@ export default function VideoSyncComponent({ boxId }) {
     stompClient.current.publish({
       destination: `/app/box/${boxId}/chat`,
       body: JSON.stringify({
-        sender: currentUser.username, // Utiliser le vrai nom d'utilisateur
-        senderId: currentUser.id, // Ajouter l'ID pour identification
+        sender: currentUser.username,
+        senderId: currentUser.id,
         content: newMessage,
       }),
     });
@@ -223,20 +256,28 @@ export default function VideoSyncComponent({ boxId }) {
               ref={playerRef}
               url={boxInfo.movie.videoUrl}
               playing={playing}
-              controls
+              controls={true}
               onPlay={handlePlay}
               onPause={handlePause}
               onSeek={handleSeek}
+              onProgress={handleProgress}
+              onReady={handleReady}
               width="100%"
               height="100%"
               config={{
                 file: {
                   forceHLS: true,
+                  attributes: {
+                    controlsList: "nodownload", // Optionnel: empêche le téléchargement
+                  },
                 },
               }}
+              // Propriétés supplémentaires pour améliorer la réactivité
+              progressInterval={1000}
+              playsinline={true}
             />
             {!connected && (
-              <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
                 <div className="text-center">
                   <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                   <p className="text-white font-medium">
