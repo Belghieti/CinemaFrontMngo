@@ -216,7 +216,7 @@ export default function Dashboard() {
                   {/* Welcome Section */}
                   <div className="text-center lg:text-left">
                     <div className="flex items-center justify-center lg:justify-start space-x-3 mb-6">
-                      <span className="text-4xl">✨</span>
+                      <span className="text-4xl">.</span>
                       <h2 className="text-4xl font-black text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text">
                         Bienvenue !
                       </h2>
