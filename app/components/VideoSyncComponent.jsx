@@ -17,6 +17,7 @@ export default function VideoSyncComponent({ boxId }) {
   const [invitations, setInvitations] = useState([]);
   const [boxInfo, setBoxInfo] = useState(null);
   const [error, setError] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Récupération de la box + film
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function VideoSyncComponent({ boxId }) {
     })
       .then((res) => res.json())
       .then((user) => {
+        setCurrentUser(user); // Stocker les infos de l'utilisateur actuel
         fetch(
           `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}?userId=${user.id}`,
           {
@@ -114,11 +116,16 @@ export default function VideoSyncComponent({ boxId }) {
   };
 
   const sendMessage = () => {
-    if (!newMessage.trim() || !stompClient.current?.connected) return;
+    if (!newMessage.trim() || !stompClient.current?.connected || !currentUser)
+      return;
 
     stompClient.current.publish({
       destination: `/app/box/${boxId}/chat`,
-      body: JSON.stringify({ sender: "Moi", content: newMessage }),
+      body: JSON.stringify({
+        sender: currentUser.username, // Utiliser le vrai nom d'utilisateur
+        senderId: currentUser.id, // Ajouter l'ID pour identification
+        content: newMessage,
+      }),
     });
 
     setNewMessage("");
@@ -309,24 +316,50 @@ export default function VideoSyncComponent({ boxId }) {
                 </p>
               </div>
             ) : (
-              messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className="bg-white/5 p-3 rounded-xl border border-white/10"
-                >
-                  <div className="flex items-center space-x-2 mb-1">
-                    <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-xs font-bold text-white">
-                      {msg.sender?.charAt(0)?.toUpperCase() || "?"}
+              messages.map((msg, i) => {
+                const isCurrentUser =
+                  currentUser && msg.senderId === currentUser.id;
+                return (
+                  <div
+                    key={i}
+                    className={`p-3 rounded-xl border ${
+                      isCurrentUser
+                        ? "bg-blue-500/20 border-blue-500/30 ml-8"
+                        : "bg-white/5 border-white/10 mr-8"
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2 mb-1">
+                      <div
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white ${
+                          isCurrentUser
+                            ? "bg-gradient-to-br from-blue-500 to-cyan-500"
+                            : "bg-gradient-to-br from-purple-500 to-pink-500"
+                        }`}
+                      >
+                        {msg.sender?.charAt(0)?.toUpperCase() || "?"}
+                      </div>
+                      <span
+                        className={`font-semibold text-sm ${
+                          isCurrentUser ? "text-blue-300" : "text-purple-300"
+                        }`}
+                      >
+                        {isCurrentUser ? "Vous" : msg.sender}
+                      </span>
+                      <span className="text-xs text-gray-500">•</span>
+                      <span className="text-xs text-gray-500">maintenant</span>
                     </div>
-                    <span className="font-semibold text-blue-300 text-sm">
-                      {msg.sender}
-                    </span>
-                    <span className="text-xs text-gray-500">•</span>
-                    <span className="text-xs text-gray-500">maintenant</span>
+                    <p
+                      className={`text-sm ${
+                        isCurrentUser
+                          ? "ml-8 text-blue-100"
+                          : "ml-8 text-gray-200"
+                      }`}
+                    >
+                      {msg.content}
+                    </p>
                   </div>
-                  <p className="text-gray-200 text-sm ml-8">{msg.content}</p>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
@@ -342,7 +375,7 @@ export default function VideoSyncComponent({ boxId }) {
             />
             <button
               onClick={sendMessage}
-              disabled={!newMessage.trim() || !connected}
+              disabled={!newMessage.trim() || !connected || !currentUser}
               className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-blue-500/25 hover:scale-105 active:scale-95"
             >
               <svg
