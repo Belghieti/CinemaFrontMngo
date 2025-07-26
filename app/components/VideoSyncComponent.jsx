@@ -135,10 +135,9 @@ export default function VideoSyncComponent({ boxId }) {
         <ReactPlayer
           ref={playerRef}
           // url="https://1bnpkpnpqghq0.acek-cdn.com/hls2/01/03502/nvhrxg58s34o_n/index-v1-a1.m3u8?t=JNgnoL_8zLvnY-qjsfIFIU2gkOvKUhU5qRA6WgW9XME&s=1753461100&e=129600&f=17512328&srv=LFDu7HStkKAt&i=0.4&sphttps://1bnpkpnpqghq0.acek-cdn.com/hls2/01/03502/nvhrxg58s34o_n/index-v1-a1.m3u8?t=JNgnoL_8zLvnY-qjsfIFIU2gkOvKUhU5qRA6WgW9XME&s=1753461100&e=129600&f=17512328&srv=LFDu7HStkKAt&i=0.4&sp=500&p1=LFDu7HStkKAt&p2=LFDu7HStkKAt&asn=36903=500&p1=LFDu7HStkKAt&p2=LFDu7HStkKAt&asn=36903"
-          // url={boxInfo.movie.videoUrl} // ✅ Lien vidéo dynamique ici !
+          url={boxInfo.movie.videoUrl} // ✅ Lien vidéo dynamique ici !
           // url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrvzui5bgeyf3tkumpyb6awnva3dsynqgsg5ht2dqoxltkboulpsmxmmm4wintkjh2b5vfj/Angel__x27_s.Last_Mission._Love.S01.E06.720p.WeCima.Show.mp4"
           // url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrvzui5bgeyf3tkumpyb6awnva3dsynqgsg5ht2dqoxltkbovtrvsdlu7twccqcyln2ooie/Angel__x27_s.Last_Mission._Love.S01.E06.720p.WeCima.Show.mp4"
-          url="https://s.drslayer.com/Angels_Last_Mission_Love/1_v2/m.mp4?token=DrEcTtPhtEFn1chUx4IzPA&expires=1753503778"
           playing={playing}
           controls
           onPlay={handlePlay}
