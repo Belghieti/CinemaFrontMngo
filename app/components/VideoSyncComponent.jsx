@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Client } from "@stomp/stompjs";
 import ReactPlayer from "react-player";
+import VideoCallComponent from "./VideoCallComponent";
 
 export default function VideoSyncComponent({ boxId }) {
   const playerRef = useRef(null);
@@ -277,7 +278,7 @@ export default function VideoSyncComponent({ boxId }) {
           </div>
         )}
       </div>
-
+      <VideoCallComponent boxId={boxInfo.id} currentUser={currentUser} />
       {/* Chat and Invitations Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chat Section */}
