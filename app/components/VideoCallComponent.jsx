@@ -188,10 +188,32 @@ function VideoCallComponent({
     }
 
     peerConnection.current.ontrack = (event) => {
+      console.log("🎥 Piste vidéo reçue:", event.track.kind, event.streams);
       if (remoteVideoRef.current && event.streams[0]) {
+        console.log(
+          "📺 Configuration du stream distant:",
+          event.streams[0].getTracks().map((t) => `${t.kind}: ${t.enabled}`)
+        );
         remoteVideoRef.current.srcObject = event.streams[0];
         setRemoteUserConnected(true);
-        remoteVideoRef.current.play().catch(() => {});
+
+        // Forcer la lecture avec gestion d'erreurs améliorée
+        const playPromise = remoteVideoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              console.log("✅ Lecture vidéo distante démarrée");
+            })
+            .catch((error) => {
+              console.error("❌ Erreur lecture vidéo distante:", error);
+              // Réessayer après un court délai
+              setTimeout(() => {
+                if (remoteVideoRef.current) {
+                  remoteVideoRef.current.play().catch(console.error);
+                }
+              }, 500);
+            });
+        }
       }
     };
 
@@ -219,17 +241,34 @@ function VideoCallComponent({
   };
 
   const createOffer = async () => {
-    if (!peerConnection.current) return;
+    if (!peerConnection.current) {
+      console.error("❌ Pas de connexion peer pour créer l'offre");
+      return;
+    }
 
     try {
+      console.log("🚀 Création d'une offre...");
+
+      // Vérifier que les tracks locaux sont bien ajoutés
+      const senders = peerConnection.current.getSenders();
+      console.log(
+        "📤 Tracks envoyés:",
+        senders.map((s) => s.track?.kind).filter(Boolean)
+      );
+
       const offer = await peerConnection.current.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
       });
+
       await peerConnection.current.setLocalDescription(offer);
+      console.log("📨 Offre créée:", offer.type);
+
       sendSignal({ type: "offer", offer });
+      console.log("✅ Offre envoyée avec succès");
     } catch (err) {
-      setError("Erreur lors de la création de l'offre");
+      console.error("❌ Erreur lors de la création de l'offre:", err);
+      setError("Erreur lors de la création de l'offre: " + err.message);
     }
   };
 
@@ -269,6 +308,7 @@ function VideoCallComponent({
           break;
 
         case "answer":
+          console.log("📥 Réponse reçue de:", data.username);
           if (
             peerConnection.current &&
             peerConnection.current.signalingState === "have-local-offer"
@@ -276,10 +316,17 @@ function VideoCallComponent({
             await peerConnection.current.setRemoteDescription(
               new RTCSessionDescription(data.answer)
             );
+            console.log("✅ Réponse acceptée, connexion établie");
+          } else {
+            console.warn(
+              "⚠️ Réponse reçue dans un état incorrect:",
+              peerConnection.current?.signalingState
+            );
           }
           break;
 
         case "ice-candidate":
+          console.log("🧊 ICE candidate reçu:", data.candidate?.type);
           if (
             peerConnection.current &&
             peerConnection.current.remoteDescription
@@ -288,9 +335,20 @@ function VideoCallComponent({
               await peerConnection.current.addIceCandidate(
                 new RTCIceCandidate(data.candidate)
               );
+              console.log("✅ ICE candidate ajouté:", data.candidate.type);
             } catch (err) {
-              console.error("Erreur ICE candidate:", err);
+              console.error("❌ Erreur ICE candidate:", err);
             }
+          } else {
+            console.warn(
+              "⚠️ ICE candidate reçu mais pas de description distante"
+            );
+            // Stocker les candidates pour les traiter plus tard
+            if (!window.pendingIceCandidates) {
+              window.pendingIceCandidates = [];
+            }
+            window.pendingIceCandidates.push(data.candidate);
+            console.log("📦 ICE candidate mis en attente");
           }
           break;
 
@@ -397,10 +455,18 @@ function VideoCallComponent({
               autoPlay
               playsInline
               className="w-full h-full object-cover"
+              muted={false}
             />
             {!remoteUserConnected && (
               <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
                 <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+              </div>
+            )}
+            {remoteUserConnected && (
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent">
+                <div className="text-xs text-white text-center truncate px-1">
+                  {remoteUserName || "Remote"}
+                </div>
               </div>
             )}
           </div>
