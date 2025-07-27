@@ -213,10 +213,20 @@ export default function VideoCallComponent({
 
     // Gérer les pistes distantes
     peerConnection.current.ontrack = (event) => {
-      console.log("Piste distante reçue:", event.track.kind);
+      console.log("Piste distante reçue:", event.track.kind, event.streams);
       if (remoteVideoRef.current && event.streams[0]) {
+        console.log(
+          "Configuration du stream distant:",
+          event.streams[0].getTracks()
+        );
         remoteVideoRef.current.srcObject = event.streams[0];
         setRemoteUserConnected(true);
+
+        // Forcer la lecture de la vidéo
+        remoteVideoRef.current.play().catch((err) => {
+          console.error("Erreur de lecture vidéo distante:", err);
+        });
+
         console.log("Vidéo distante configurée");
       }
     };
@@ -293,6 +303,15 @@ export default function VideoCallComponent({
     console.log("Signal reçu:", data.type, "de", data.username);
     setRemoteUserName(data.username || "Participant");
 
+    // S'assurer qu'on a une connexion peer avant de traiter les signaux
+    if (
+      !peerConnection.current &&
+      (data.type === "answer" || data.type === "ice-candidate")
+    ) {
+      console.log("Création de la connexion peer pour traiter:", data.type);
+      await createPeerConnection();
+    }
+
     try {
       switch (data.type) {
         case "offer":
@@ -309,7 +328,10 @@ export default function VideoCallComponent({
             new RTCSessionDescription(data.offer)
           );
 
-          const answer = await peerConnection.current.createAnswer();
+          const answer = await peerConnection.current.createAnswer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+          });
           await peerConnection.current.setLocalDescription(answer);
 
           sendSignal({ type: "answer", answer });
@@ -473,11 +495,30 @@ export default function VideoCallComponent({
       </div>
 
       {/* Debug Info */}
-      <div className="text-xs text-gray-500 bg-gray-800/50 p-2 rounded">
-        Participants: {callParticipants.size} | Initiateur:{" "}
-        {isInitiator.current ? "Oui" : "Non"} | WebSocket:{" "}
-        {existingStompClient?.current?.connected ? "✅" : "❌"} | Peer:{" "}
-        {peerConnection.current?.connectionState || "Non créé"}
+      <div className="text-xs text-gray-500 bg-gray-800/50 p-2 rounded flex justify-between items-center">
+        <div>
+          Participants: {callParticipants.size} | Initiateur:{" "}
+          {isInitiator.current ? "Oui" : "Non"} | WebSocket:{" "}
+          {existingStompClient?.current?.connected ? "✅" : "❌"} | Peer:{" "}
+          {peerConnection.current?.connectionState || "Non créé"}
+        </div>
+        {isCallActive && (
+          <button
+            onClick={async () => {
+              console.log("Force reconnexion...");
+              if (peerConnection.current) {
+                peerConnection.current.close();
+              }
+              await createPeerConnection();
+              if (isInitiator.current) {
+                setTimeout(() => createOffer(), 1000);
+              }
+            }}
+            className="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded text-white text-xs"
+          >
+            Reconnecter
+          </button>
+        )}
       </div>
 
       {/* Error Display */}
@@ -534,6 +575,17 @@ export default function VideoCallComponent({
             autoPlay
             playsInline
             className="w-full h-48 object-cover bg-gray-900 rounded-xl border border-white/10"
+            onLoadedMetadata={() => {
+              console.log("Métadonnées vidéo distante chargées");
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.play().catch((err) => {
+                  console.error("Erreur lecture auto:", err);
+                });
+              }
+            }}
+            onCanPlay={() => {
+              console.log("Vidéo distante prête à être lue");
+            }}
           />
           {!remoteUserConnected && (
             <div className="absolute inset-0 bg-gray-900/90 rounded-xl flex items-center justify-center">
