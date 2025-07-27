@@ -7,6 +7,7 @@ import CreateBoxForm from "../components/CreateBoxForm";
 import AddMovieForm from "../components/AddMovieForm";
 import JoinRoomComponent from "../components/JoinRoomComponent";
 import AdBanner from "../components/AdBanner";
+import GuideComponent from "../components/GuideComponent";
 
 export default function Dashboard() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -314,6 +315,7 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+        <GuideComponent />
       </main>
 
       {/* FOOTER */}
