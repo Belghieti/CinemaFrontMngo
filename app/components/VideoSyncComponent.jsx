@@ -229,7 +229,7 @@ export default function VideoSyncComponent({ boxId }) {
             <ReactPlayer
               ref={playerRef}
               //url={boxInfo.movie.videoUrl}
-              url="https://aflam-cdn-cash-28-rty.dialymotion.online/yh5cata2pxikjnl75zq2r43rvvs6vevuesrmdcuobcxfmft47c5l7ks4zvmq/v.mp4"
+              url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrvjui5bgeyf3tkumpzf4khpo75nclcqpang3l5ifh7vnuwjqjiacccnihovxjptsfe4hsj/Angel__x27_s.Last_Mission._Love.S01.E10.720p.WeCima.Show.mp4"
               playing={playing}
               controls
               onPlay={handlePlay}
