@@ -236,11 +236,11 @@ export default function VideoSyncComponent({ boxId }) {
               onSeek={handleSeek}
               width="100%"
               height="100%"
-              config={{
+              /*config={{
                 file: {
                   forceHLS: true,
                 },
-              }}
+              }}*/
             />
             {!connected && (
               <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
