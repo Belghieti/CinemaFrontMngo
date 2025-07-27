@@ -228,7 +228,8 @@ export default function VideoSyncComponent({ boxId }) {
           <div className="relative aspect-video">
             <ReactPlayer
               ref={playerRef}
-              url={boxInfo.movie.videoUrl}
+              //url={boxInfo.movie.videoUrl}
+              url="https://aflam-cdn-cash-28-rty.dialymotion.online/yh5cata2pxikjnl75zq2r43rvvs6vevuesrmdcuobcxfmft47c5l7ks4zvmq/v.mp4"
               playing={playing}
               controls
               onPlay={handlePlay}
