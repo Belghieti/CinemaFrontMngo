@@ -14,6 +14,17 @@ export default function Dashboard() {
   const [userInfo, setUserInfo] = useState(null);
   const router = useRouter();
 
+  // Fonction pour gérer l'ajout de film
+  const handleMovieAdded = () => {
+    console.log("Film ajouté avec succès !");
+    // Afficher une notification de succès
+    alert("Film ajouté avec succès ! La page va se rafraîchir...");
+    // Actualiser la page après un court délai pour que le film apparaisse dans CreateBoxForm
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  };
+
   const handleLogout = async () => {
     const token = localStorage.getItem("token");
 
@@ -148,7 +159,7 @@ export default function Dashboard() {
         ) : (
           <div className="max-w-7xl mx-auto">
             {/* Hero Section */}
-            <div className="text-center mb-12 py-8">
+            <div id="welcome-section" className="text-center mb-12 py-8">
               <h2 className="text-5xl sm:text-6xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 text-transparent bg-clip-text mb-4">
                 Bienvenue sur CinéSync
               </h2>
@@ -163,7 +174,10 @@ export default function Dashboard() {
               {/* LEFT PANEL - Actions */}
               <div className="lg:col-span-1 space-y-6">
                 {/* Add Movie Card */}
-                <div className="group bg-gradient-to-br from-pink-500/10 to-rose-500/10 backdrop-blur-xl p-6 rounded-3xl border border-pink-500/20 hover:border-pink-500/40 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-pink-500/10">
+                <div
+                  id="add-movie-card"
+                  className="group bg-gradient-to-br from-pink-500/10 to-rose-500/10 backdrop-blur-xl p-6 rounded-3xl border border-pink-500/20 hover:border-pink-500/40 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-pink-500/10"
+                >
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg">
                       🎞️
@@ -175,11 +189,14 @@ export default function Dashboard() {
                   <p className="text-gray-400 text-sm mb-4">
                     Partagez vos films préférés avec vos amis
                   </p>
-                  <AddMovieForm onMovieAdded={() => {}} />
+                  <AddMovieForm onMovieAdded={handleMovieAdded} />
                 </div>
 
                 {/* Create Room Card */}
-                <div className="group bg-gradient-to-br from-emerald-500/10 to-teal-500/10 backdrop-blur-xl p-6 rounded-3xl border border-emerald-500/20 hover:border-emerald-500/40 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/10">
+                <div
+                  id="create-room-card"
+                  className="group bg-gradient-to-br from-emerald-500/10 to-teal-500/10 backdrop-blur-xl p-6 rounded-3xl border border-emerald-500/20 hover:border-emerald-500/40 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/10"
+                >
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg">
                       📦
@@ -195,7 +212,10 @@ export default function Dashboard() {
                 </div>
 
                 {/* Join Room Card */}
-                <div className="group bg-gradient-to-br from-amber-500/10 to-orange-500/10 backdrop-blur-xl p-6 rounded-3xl border border-amber-500/20 hover:border-amber-500/40 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-amber-500/10">
+                <div
+                  id="join-room-card"
+                  className="group bg-gradient-to-br from-amber-500/10 to-orange-500/10 backdrop-blur-xl p-6 rounded-3xl border border-amber-500/20 hover:border-amber-500/40 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-amber-500/10"
+                >
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg">
                       🔑
@@ -217,7 +237,7 @@ export default function Dashboard() {
                   {/* Welcome Section */}
                   <div className="text-center lg:text-left">
                     <div className="flex items-center justify-center lg:justify-start space-x-3 mb-6">
-                      <span className="text-4xl">.</span>
+                      <span className="text-4xl">🎭</span>
                       <h2 className="text-4xl font-black text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text">
                         Bienvenue !
                       </h2>
@@ -234,7 +254,10 @@ export default function Dashboard() {
                   </div>
 
                   {/* Features Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div
+                    id="features-grid"
+                    className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                  >
                     <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/10 p-6 rounded-2xl border border-purple-500/20">
                       <div className="text-3xl mb-3">📽️</div>
                       <h4 className="font-bold text-white mb-2">
@@ -315,7 +338,9 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-        <GuideComponent />
+
+        {/* Guide Component avec la fonction handleMovieAdded */}
+        <GuideComponent onMovieAdded={handleMovieAdded} />
       </main>
 
       {/* FOOTER */}
