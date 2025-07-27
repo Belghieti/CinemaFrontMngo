@@ -19,6 +19,8 @@ export default function VideoCallComponent({
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [callParticipants, setCallParticipants] = useState(new Set());
   const [remoteUserName, setRemoteUserName] = useState("");
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const ICE_SERVERS = {
     iceServers: [
@@ -64,23 +66,19 @@ export default function VideoCallComponent({
     if (data.type === "user-joined" && data.userId !== currentUser?.id) {
       setCallParticipants((prev) => new Set([...prev, data.userId]));
 
-      // Si on est déjà en appel et qu'un nouvel utilisateur rejoint
       if (isCallActive) {
-        // Créer une nouvelle connexion peer si on n'en a pas déjà une active
         if (
           !peerConnection.current ||
           peerConnection.current.connectionState === "closed"
         ) {
           createPeerConnection().then(() => {
-            // Devenir l'initiateur si on était déjà dans l'appel
             isInitiator.current = true;
-            setTimeout(() => createOffer(), 1500); // Délai plus long pour laisser l'autre s'initialiser
+            setTimeout(() => createOffer(), 1500);
           });
         } else if (
           peerConnection.current.connectionState === "new" ||
           peerConnection.current.connectionState === "connecting"
         ) {
-          // Si la connexion est déjà en cours, devenir l'initiateur
           isInitiator.current = true;
           setTimeout(() => createOffer(), 1500);
         }
@@ -149,7 +147,6 @@ export default function VideoCallComponent({
       setIsConnecting(true);
       setError(null);
 
-      // Obtenir le flux média local
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 640 },
@@ -170,11 +167,8 @@ export default function VideoCallComponent({
 
       setIsCallActive(true);
       setIsConnecting(false);
-
-      // Notifier qu'un utilisateur a rejoint
       notifyUserJoined();
 
-      // Attendre un peu avant de vérifier s'il faut créer une connexion
       setTimeout(async () => {
         if (callParticipants.size > 0) {
           console.log("Participants détectés, création de la connexion peer");
@@ -195,7 +189,6 @@ export default function VideoCallComponent({
   };
 
   const createPeerConnection = async () => {
-    // Fermer l'ancienne connexion si elle existe
     if (peerConnection.current) {
       peerConnection.current.close();
     }
@@ -203,7 +196,6 @@ export default function VideoCallComponent({
     peerConnection.current = new RTCPeerConnection(ICE_SERVERS);
     console.log("Nouvelle connexion peer créée");
 
-    // Ajouter les pistes locales
     if (localStream.current) {
       localStream.current.getTracks().forEach((track) => {
         console.log("Ajout de la piste:", track.kind);
@@ -211,7 +203,6 @@ export default function VideoCallComponent({
       });
     }
 
-    // Gérer les pistes distantes
     peerConnection.current.ontrack = (event) => {
       console.log("Piste distante reçue:", event.track.kind, event.streams);
       if (remoteVideoRef.current && event.streams[0]) {
@@ -222,7 +213,6 @@ export default function VideoCallComponent({
         remoteVideoRef.current.srcObject = event.streams[0];
         setRemoteUserConnected(true);
 
-        // Forcer la lecture de la vidéo
         remoteVideoRef.current.play().catch((err) => {
           console.error("Erreur de lecture vidéo distante:", err);
         });
@@ -231,7 +221,6 @@ export default function VideoCallComponent({
       }
     };
 
-    // Gérer les ICE candidates
     peerConnection.current.onicecandidate = (event) => {
       if (event.candidate) {
         console.log("ICE candidate généré:", event.candidate.type);
@@ -244,7 +233,6 @@ export default function VideoCallComponent({
       }
     };
 
-    // Gérer l'état de connexion
     peerConnection.current.onconnectionstatechange = () => {
       const state = peerConnection.current.connectionState;
       console.log("État de connexion changé:", state);
@@ -262,7 +250,6 @@ export default function VideoCallComponent({
       }
     };
 
-    // Gérer l'état ICE
     peerConnection.current.oniceconnectionstatechange = () => {
       const iceState = peerConnection.current.iceConnectionState;
       console.log("État ICE:", iceState);
@@ -297,13 +284,11 @@ export default function VideoCallComponent({
   };
 
   const handleSignal = async (data) => {
-    // Ignorer ses propres signaux
     if (data.userId === currentUser?.id) return;
 
     console.log("Signal reçu:", data.type, "de", data.username);
     setRemoteUserName(data.username || "Participant");
 
-    // S'assurer qu'on a une connexion peer avant de traiter les signaux
     if (
       !peerConnection.current &&
       (data.type === "answer" || data.type === "ice-candidate")
@@ -315,7 +300,6 @@ export default function VideoCallComponent({
     try {
       switch (data.type) {
         case "offer":
-          // Créer une nouvelle connexion si nécessaire
           if (
             !peerConnection.current ||
             peerConnection.current.signalingState === "closed"
@@ -390,7 +374,6 @@ export default function VideoCallComponent({
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
-    // Fermer la connexion peer
     if (peerConnection.current) {
       peerConnection.current.close();
       peerConnection.current = null;
@@ -421,22 +404,18 @@ export default function VideoCallComponent({
   const endCall = () => {
     console.log("Fin de l'appel");
 
-    // Notifier la déconnexion
     notifyUserLeft();
 
-    // Fermer la connexion peer
     if (peerConnection.current) {
       peerConnection.current.close();
       peerConnection.current = null;
     }
 
-    // Arrêter le flux local
     if (localStream.current) {
       localStream.current.getTracks().forEach((track) => track.stop());
       localStream.current = null;
     }
 
-    // Reset des refs vidéo
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
     }
@@ -452,297 +431,119 @@ export default function VideoCallComponent({
     setCallParticipants(new Set());
     setRemoteUserName("");
     isInitiator.current = false;
+    setIsMinimized(false);
+    setIsExpanded(false);
   };
 
+  // Si pas d'appel actif, afficher le bouton de démarrage flottant
+  if (!isCallActive) {
+    return (
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={startCall}
+          disabled={
+            isConnecting ||
+            !currentUser ||
+            !existingStompClient?.current?.connected
+          }
+          className="group bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed p-4 rounded-full shadow-2xl hover:shadow-green-500/50 hover:scale-110 active:scale-95 transition-all duration-300"
+        >
+          {isConnecting ? (
+            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <svg
+              className="w-6 h-6 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+              />
+            </svg>
+          )}
+          {/* Tooltip */}
+          <div className="absolute bottom-full right-0 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/90 text-white text-sm px-3 py-2 rounded-lg whitespace-nowrap">
+            Démarrer l'appel vidéo
+            <div className="absolute top-full right-3 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/90"></div>
+          </div>
+        </button>
+      </div>
+    );
+  }
+
+  // Appel actif - Mode Picture-in-Picture
   return (
-    <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl p-6 rounded-2xl border border-white/10 shadow-xl space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-500 rounded-xl flex items-center justify-center text-xl shadow-lg">
-            📹
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-red-400">Appel Vidéo</h3>
-            <p className="text-sm text-gray-400">
+    <div
+      className={`fixed z-50 transition-all duration-500 ease-in-out ${
+        isExpanded
+          ? "inset-4 md:inset-8"
+          : isMinimized
+          ? "bottom-6 right-6 w-16 h-16"
+          : "bottom-6 right-6 w-80 h-auto"
+      }`}
+    >
+      <div
+        className={`bg-black/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden ${
+          isExpanded ? "h-full" : "h-auto"
+        }`}
+      >
+        {/* Header - toujours visible */}
+        <div
+          className={`flex items-center justify-between p-3 bg-gradient-to-r from-purple-600/20 to-pink-600/20 ${
+            isMinimized ? "hidden" : "block"
+          }`}
+        >
+          <div className="flex items-center space-x-2">
+            <div
+              className={`w-2 h-2 rounded-full animate-pulse ${
+                remoteUserConnected ? "bg-green-400" : "bg-yellow-400"
+              }`}
+            ></div>
+            <span className="text-white text-sm font-medium">
               {remoteUserConnected
-                ? `Connecté avec ${remoteUserName}`
-                : callParticipants.size > 0
-                ? "Connexion en cours..."
-                : "En attente..."}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              remoteUserConnected
-                ? "bg-green-500"
-                : isCallActive
-                ? "bg-yellow-500"
-                : "bg-gray-500"
-            } animate-pulse`}
-          ></div>
-          <span className="text-sm text-gray-400">
-            {remoteUserConnected
-              ? "Connecté"
-              : isCallActive
-              ? "En attente"
-              : "Inactif"}
-          </span>
-        </div>
-      </div>
-
-      {/* Debug Info */}
-      <div className="text-xs text-gray-500 bg-gray-800/50 p-2 rounded flex justify-between items-center">
-        <div>
-          Participants: {callParticipants.size} | Initiateur:{" "}
-          {isInitiator.current ? "Oui" : "Non"} | WebSocket:{" "}
-          {existingStompClient?.current?.connected ? "✅" : "❌"} | Peer:{" "}
-          {peerConnection.current?.connectionState || "Non créé"}
-        </div>
-        {isCallActive && (
-          <button
-            onClick={async () => {
-              console.log("Force reconnexion...");
-              if (peerConnection.current) {
-                peerConnection.current.close();
-              }
-              await createPeerConnection();
-              if (isInitiator.current) {
-                setTimeout(() => createOffer(), 1000);
-              }
-            }}
-            className="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded text-white text-xs"
-          >
-            Reconnecter
-          </button>
-        )}
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4">
-          <p className="text-red-300 text-sm">{error}</p>
-        </div>
-      )}
-
-      {/* Video Containers */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Local Video */}
-        <div className="relative">
-          <video
-            ref={localVideoRef}
-            autoPlay
-            muted
-            playsInline
-            className="w-full h-48 object-cover bg-gray-900 rounded-xl border border-white/10"
-          />
-          <div className="absolute bottom-2 left-2 bg-black/70 rounded-lg px-2 py-1">
-            <span className="text-white text-xs font-medium">
-              {currentUser?.username || "Vous"}
+                ? `📹 ${remoteUserName}`
+                : "⏳ En attente..."}
             </span>
           </div>
-          {isVideoOff && (
-            <div className="absolute inset-0 bg-gray-900 rounded-xl flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <svg
-                    className="w-6 h-6 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                </div>
-                <p className="text-gray-400 text-sm">Caméra désactivée</p>
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Remote Video */}
-        <div className="relative">
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className="w-full h-48 object-cover bg-gray-900 rounded-xl border border-white/10"
-            onLoadedMetadata={() => {
-              console.log("Métadonnées vidéo distante chargées");
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.play().catch((err) => {
-                  console.error("Erreur lecture auto:", err);
-                });
-              }
-            }}
-            onCanPlay={() => {
-              console.log("Vidéo distante prête à être lue");
-            }}
-          />
-          {!remoteUserConnected && (
-            <div className="absolute inset-0 bg-gray-900/90 rounded-xl flex items-center justify-center">
-              <div className="text-center">
-                {callParticipants.size > 0 ? (
-                  <>
-                    <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-300 text-sm">
-                      Connexion avec l'autre utilisateur...
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg
-                        className="w-6 h-6 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-gray-300 text-sm">
-                      En attente d'un autre utilisateur...
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-          {remoteUserConnected && (
-            <div className="absolute bottom-2 left-2 bg-black/70 rounded-lg px-2 py-1">
-              <span className="text-white text-xs font-medium">
-                {remoteUserName || "Participant"}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="flex justify-center space-x-3">
-        {!isCallActive ? (
-          <button
-            onClick={startCall}
-            disabled={
-              isConnecting ||
-              !currentUser ||
-              !existingStompClient?.current?.connected
-            }
-            className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-green-500/25 hover:scale-105 active:scale-95 flex items-center space-x-2"
-          >
-            {isConnecting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Connexion...</span>
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-                <span>Démarrer l'appel</span>
-              </>
-            )}
-          </button>
-        ) : (
-          <div className="flex space-x-3">
-            {/* Mute Button */}
+          <div className="flex items-center space-x-1">
             <button
-              onClick={toggleMute}
-              className={`p-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:scale-105 active:scale-95 ${
-                isMuted
-                  ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-gray-600 hover:bg-gray-700 text-white"
-              }`}
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
             >
               <svg
-                className="w-5 h-5"
+                className="w-4 h-4 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                {isMuted ? (
+                {isExpanded ? (
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"
+                    d="M6 18L18 6M6 6l12 12"
                   />
                 ) : (
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                    d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
                   />
                 )}
               </svg>
             </button>
-
-            {/* Video Toggle Button */}
             <button
-              onClick={toggleVideo}
-              className={`p-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:scale-105 active:scale-95 ${
-                isVideoOff
-                  ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-gray-600 hover:bg-gray-700 text-white"
-              }`}
+              onClick={() => setIsMinimized(!isMinimized)}
+              className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
             >
               <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                {isVideoOff ? (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728"
-                  />
-                ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                )}
-              </svg>
-            </button>
-
-            {/* End Call Button */}
-            <button
-              onClick={endCall}
-              className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-red-500/25 hover:scale-105 active:scale-95 flex items-center space-x-2"
-            >
-              <svg
-                className="w-5 h-5"
+                className="w-4 h-4 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -751,27 +552,213 @@ export default function VideoCallComponent({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"
+                  d="M20 12H4"
                 />
               </svg>
-              <span>Terminer</span>
             </button>
           </div>
+        </div>
+
+        {/* Version minimisée */}
+        {isMinimized && (
+          <div
+            onClick={() => setIsMinimized(false)}
+            className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+          >
+            <svg
+              className="w-8 h-8 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+              />
+            </svg>
+          </div>
+        )}
+
+        {/* Contenu principal - caché si minimisé */}
+        {!isMinimized && (
+          <>
+            {/* Zone vidéo */}
+            <div className={`relative ${isExpanded ? "h-full p-4" : "p-3"}`}>
+              <div
+                className={`grid gap-2 ${
+                  isExpanded
+                    ? "grid-cols-2 h-full"
+                    : remoteUserConnected
+                    ? "grid-cols-2"
+                    : "grid-cols-1"
+                }`}
+              >
+                {/* Vidéo principale (remote si connecté, sinon local) */}
+                <div
+                  className={`relative ${isExpanded ? "h-full" : "h-32"} ${
+                    !remoteUserConnected && !isExpanded ? "col-span-2" : ""
+                  }`}
+                >
+                  {remoteUserConnected ? (
+                    <>
+                      <video
+                        ref={remoteVideoRef}
+                        autoPlay
+                        playsInline
+                        className="w-full h-full object-cover bg-gray-900 rounded-xl"
+                      />
+                      <div className="absolute bottom-2 left-2 bg-black/70 rounded-lg px-2 py-1">
+                        <span className="text-white text-xs font-medium">
+                          {remoteUserName}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                        <p className="text-xs opacity-75">Connexion...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Vidéo locale (picture-in-picture) */}
+                {(remoteUserConnected || isExpanded) && (
+                  <div className={`relative ${isExpanded ? "h-full" : "h-32"}`}>
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover bg-gray-900 rounded-xl"
+                    />
+                    <div className="absolute bottom-2 left-2 bg-black/70 rounded-lg px-2 py-1">
+                      <span className="text-white text-xs font-medium">
+                        Vous
+                      </span>
+                    </div>
+                    {isVideoOff && (
+                      <div className="absolute inset-0 bg-gray-900 rounded-xl flex items-center justify-center">
+                        <div className="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center">
+                          <svg
+                            className="w-3 h-3 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Contrôles */}
+            <div className="flex items-center justify-center space-x-2 p-3 bg-black/30">
+              <button
+                onClick={toggleMute}
+                className={`p-2 rounded-full transition-all ${
+                  isMuted
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-white/20 hover:bg-white/30"
+                }`}
+              >
+                <svg
+                  className="w-4 h-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  {isMuted ? (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"
+                    />
+                  ) : (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                    />
+                  )}
+                </svg>
+              </button>
+
+              <button
+                onClick={toggleVideo}
+                className={`p-2 rounded-full transition-all ${
+                  isVideoOff
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-white/20 hover:bg-white/30"
+                }`}
+              >
+                <svg
+                  className="w-4 h-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  {isVideoOff ? (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728"
+                    />
+                  ) : (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  )}
+                </svg>
+              </button>
+
+              <button
+                onClick={endCall}
+                className="p-2 bg-red-500 hover:bg-red-600 rounded-full transition-colors"
+              >
+                <svg
+                  className="w-4 h-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Message d'erreur */}
+            {error && (
+              <div className="mx-3 mb-3 bg-red-500/20 border border-red-500/30 rounded-lg p-2">
+                <p className="text-red-300 text-xs">{error}</p>
+              </div>
+            )}
+          </>
         )}
       </div>
-
-      {/* Connected Users Info */}
-      {isCallActive && (
-        <div className="text-center">
-          <p className="text-gray-400 text-sm">
-            {remoteUserConnected
-              ? `🟢 Appel en cours avec ${remoteUserName}`
-              : callParticipants.size > 0
-              ? `🟡 ${callParticipants.size} participant(s) détecté(s), connexion en cours...`
-              : "🔵 En attente d'autres participants..."}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
