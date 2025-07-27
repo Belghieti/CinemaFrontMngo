@@ -89,17 +89,28 @@ export default function VideoCallComponent({
         );
         try {
           await startCall(false); // false = ne pas notifier car on répond à une notification
+          // 🔥 IMMEDIATE PEER CONNECTION : Créer l'offre immédiatement après auto-start
+          setTimeout(async () => {
+            if (peerConnection.current && !isInitiator.current) {
+              // Le récepteur devient initiateur temporairement pour forcer la connexion
+              console.log(
+                "🔥 FORCE: Création immédiate de l'offre par le récepteur"
+              );
+              isInitiator.current = true;
+              await createOffer();
+            }
+          }, 300);
         } catch (err) {
           console.error("Erreur lors du démarrage automatique:", err);
         }
-        return; // Sortir ici pour éviter de créer une offre tout de suite
+        return;
       }
 
       // Si on est déjà en appel et qu'un nouvel utilisateur rejoint, devenir l'initiateur
       if (isCallActive && !isInitiator.current) {
         console.log("👑 Devenir l'initiateur car nouvel utilisateur rejoint");
         isInitiator.current = true;
-        setTimeout(() => createOffer(), 1000);
+        setTimeout(() => createOffer(), 500); // 🔥 Réduit de 1000ms à 500ms
       }
     } else if (data.type === "user-left") {
       setCallParticipants((prev) => {
@@ -183,6 +194,18 @@ export default function VideoCallComponent({
       // Notifier qu'un utilisateur a rejoint (seulement si c'est un démarrage manuel)
       if (shouldNotify) {
         notifyUserJoined();
+        // 🔥 FORCE CONNECTION : Si pas d'offre créée après 3 secondes, forcer
+        setTimeout(() => {
+          if (
+            isCallActive &&
+            callParticipants.size > 0 &&
+            !remoteUserConnected
+          ) {
+            console.log("🔥 TIMEOUT: Forcer la création d'offre après 3s");
+            isInitiator.current = true;
+            createOffer();
+          }
+        }, 3000);
       }
 
       // Logique d'initiateur améliorée
@@ -195,12 +218,14 @@ export default function VideoCallComponent({
           console.log(
             "👑 Je suis l'initiateur (démarrage manuel avec participants existants)"
           );
-          setTimeout(() => createOffer(), 1500);
+          setTimeout(() => createOffer(), 800); // 🔥 Réduit de 1500ms à 800ms
         }
       } else {
-        // Si on démarre automatiquement, on n'est pas l'initiateur
+        // Si on démarre automatiquement, on n'est pas l'initiateur MAIS on notifie quand même
         isInitiator.current = false;
         console.log("👤 Je suis le récepteur (démarrage automatique)");
+        // 🔥 CORRECTION MAJEURE : Notifier qu'on a rejoint même en auto-start
+        setTimeout(() => notifyUserJoined(), 200);
       }
 
       console.log("✅ Appel démarré avec succès");
@@ -254,15 +279,23 @@ export default function VideoCallComponent({
   };
 
   const createOffer = async () => {
-    if (!peerConnection.current) return;
+    if (!peerConnection.current) {
+      console.log("❌ Pas de peerConnection pour créer l'offre");
+      return;
+    }
 
     try {
       console.log("📞 Création d'une offre...");
-      const offer = await peerConnection.current.createOffer();
+      const offer = await peerConnection.current.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
       await peerConnection.current.setLocalDescription(offer);
       sendSignal({ type: "offer", offer });
+      console.log("✅ Offre créée et envoyée");
     } catch (err) {
       console.error("Erreur lors de la création de l'offre:", err);
+      setError("Erreur lors de la création de l'offre");
     }
   };
 
