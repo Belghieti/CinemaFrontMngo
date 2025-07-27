@@ -228,8 +228,8 @@ export default function VideoSyncComponent({ boxId }) {
           <div className="relative aspect-video">
             <ReactPlayer
               ref={playerRef}
-              //url={boxInfo.movie.videoUrl}
-              url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrvjui5bgeyf3tkumpzf4khpo75nclcqpang3l5ifh7vnuwjqjiacccnihovxjptsfe4hsj/Angel__x27_s.Last_Mission._Love.S01.E10.720p.WeCima.Show.mp4"
+              url={boxInfo.movie.videoUrl}
+              //url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrvjui5bgeyf3tkumpzf4khpo75nclcqpang3l5ifh7vnuwjqjiacccnihovxjptsfe4hsj/Angel__x27_s.Last_Mission._Love.S01.E10.720p.WeCima.Show.mp4"
               playing={playing}
               controls
               onPlay={handlePlay}
@@ -237,11 +237,11 @@ export default function VideoSyncComponent({ boxId }) {
               onSeek={handleSeek}
               width="100%"
               height="100%"
-              /*config={{
+              config={{
                 file: {
-                  forceHLS: true,
+                  forceHLS: boxInfo.movie?.videoUrl?.includes(".m3u8"),
                 },
-              }}*/
+              }}
             />
             {!connected && (
               <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
