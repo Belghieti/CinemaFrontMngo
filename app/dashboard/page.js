@@ -8,7 +8,6 @@ import AddMovieForm from "../components/AddMovieForm";
 import JoinRoomComponent from "../components/JoinRoomComponent";
 import AdBanner from "../components/AdBanner";
 import GuideComponent from "../components/GuideComponent";
-
 import AproposComponent from "../components/apropos";
 
 export default function Dashboard() {
@@ -338,13 +337,17 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Section des composants Guide et À propos */}
+            <div className="mt-12 space-y-8">
+              {/* Guide Component */}
+              <GuideComponent onMovieAdded={handleMovieAdded} />
+
+              {/* À propos Component */}
+              <AproposComponent />
+            </div>
           </div>
         )}
-
-        {/* Guide Component avec la fonction handleMovieAdded */}
-        <GuideComponent onMovieAdded={handleMovieAdded} />
-        <AproposComponent />
-        
       </main>
 
       {/* FOOTER */}
