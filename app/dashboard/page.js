@@ -344,12 +344,12 @@ export default function Dashboard() {
         {userInfo && (
           <div className="max-w-7xl mx-auto mt-12">
             {/* Guide Component */}
-            <div className="mb-8">
+            <div className="relative z-10 mb-20">
               <GuideComponent onMovieAdded={handleMovieAdded} />
             </div>
 
             {/* À propos Component */}
-            <div className="mb-8">
+            <div className="relative z-10 mb-20">
               <AproposComponent />
             </div>
           </div>
