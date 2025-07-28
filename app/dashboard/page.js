@@ -339,7 +339,7 @@ export default function Dashboard() {
             </div>
 
             {/* Section des composants Guide et À propos */}
-            <div className="mt-12 space-y-12">
+            <div className="mt-12 space-y-16">
               {/* Guide Component */}
               <GuideComponent onMovieAdded={handleMovieAdded} />
 
