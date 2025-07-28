@@ -337,14 +337,22 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Section des composants Guide et À propos */}
-            <div className="mt-12 space-y-8">
+        {/* Section des composants Guide et À propos - En dehors du contenu principal */}
+        {userInfo && (
+          <div className="max-w-7xl mx-auto mt-12">
+            <div className="flex flex-col gap-6">
               {/* Guide Component */}
-              <GuideComponent onMovieAdded={handleMovieAdded} />
+              <div className="w-full">
+                <GuideComponent onMovieAdded={handleMovieAdded} />
+              </div>
 
               {/* À propos Component */}
-              <AproposComponent />
+              <div className="w-full">
+                <AproposComponent />
+              </div>
             </div>
           </div>
         )}
