@@ -8,7 +8,8 @@ import AddMovieForm from "../components/AddMovieForm";
 import JoinRoomComponent from "../components/JoinRoomComponent";
 import AdBanner from "../components/AdBanner";
 import GuideComponent from "../components/GuideComponent";
-import AboutUs from "../components/apropos";
+
+import AproposComponent from "../components/apropos";
 
 export default function Dashboard() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -342,7 +343,8 @@ export default function Dashboard() {
 
         {/* Guide Component avec la fonction handleMovieAdded */}
         <GuideComponent onMovieAdded={handleMovieAdded} />
-        <AboutUs />
+        <AproposComponent />
+        
       </main>
 
       {/* FOOTER */}
