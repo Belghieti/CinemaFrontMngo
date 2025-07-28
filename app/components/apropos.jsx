@@ -28,7 +28,7 @@ const AproposComponent = () => {
   const features = [
     {
       icon: <Video className="w-8 h-8" />,
-      title: "Ajouter un film depuis YouTube",
+      title: "Ajouter un film depuis Youtube ou autre source...",
       description: "Collez simplement le lien de votre film préféré",
       color: "from-red-500 to-pink-500",
       delay: "0s",
@@ -65,32 +65,32 @@ const AproposComponent = () => {
 
   const advantages = [
     {
-      icon: "🚀",
+      icon: "🤲🏻",
       title: "Aucune installation requise",
       desc: "Accessible directement depuis votre navigateur",
     },
     {
-      icon: "🎯",
+      icon: "🤲🏻",
       title: "Interface intuitive",
       desc: "Design pensé pour une utilisation simple et agréable",
     },
     {
-      icon: "🆓",
+      icon: "🤲🏻",
       title: "Entièrement gratuit",
       desc: "Profitez de toutes les fonctionnalités sans débourser un centime",
     },
     {
-      icon: "🌍",
+      icon: "🤲🏻",
       title: "Accessible partout",
       desc: "Regardez depuis n'importe où dans le monde",
     },
     {
-      icon: "⚡",
+      icon: "🤲🏻",
       title: "Ultra rapide",
       desc: "Synchronisation en temps réel sans latence",
     },
     {
-      icon: "🔐",
+      icon: "🤲🏻",
       title: "Salles privées",
       desc: "Contrôlez qui peut rejoindre vos sessions",
     },
@@ -425,10 +425,13 @@ const AproposComponent = () => {
 
                       <div className="flex flex-wrap gap-3">
                         <span className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-sm border border-blue-500/30">
-                          React.js
+                          Next.js
                         </span>
                         <span className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm border border-green-500/30">
                           Node.js
+                        </span>
+                        <span className="bg-red-500/20 text-red-300 px-3 py-1 rounded-full text-sm border border-red-500/30">
+                          Spring Boot
                         </span>
                         <span className="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full text-sm border border-purple-500/30">
                           WebSocket
