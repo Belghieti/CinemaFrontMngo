@@ -65,32 +65,32 @@ const AproposComponent = () => {
 
   const advantages = [
     {
-      icon: "🤲🏻",
+      icon: "🌐",
       title: "Aucune installation requise",
       desc: "Accessible directement depuis votre navigateur",
     },
     {
-      icon: "🤲🏻",
+      icon: "🎨",
       title: "Interface intuitive",
       desc: "Design pensé pour une utilisation simple et agréable",
     },
     {
-      icon: "🤲🏻",
+      icon: "💰",
       title: "Entièrement gratuit",
       desc: "Profitez de toutes les fonctionnalités sans débourser un centime",
     },
     {
-      icon: "🤲🏻",
+      icon: "🌍",
       title: "Accessible partout",
       desc: "Regardez depuis n'importe où dans le monde",
     },
     {
-      icon: "🤲🏻",
+      icon: "⚡",
       title: "Ultra rapide",
       desc: "Synchronisation en temps réel sans latence",
     },
     {
-      icon: "🤲🏻",
+      icon: "🔒",
       title: "Salles privées",
       desc: "Contrôlez qui peut rejoindre vos sessions",
     },
@@ -457,7 +457,7 @@ const AproposComponent = () => {
                     <div className="grid grid-cols-2 gap-4 mb-6">
                       <div className="bg-cyan-500/20 p-4 rounded-xl border border-cyan-500/30">
                         <div className="text-2xl font-bold text-cyan-300">
-                          2024
+                          2025
                         </div>
                         <div className="text-sm text-gray-400">
                           Année de création
