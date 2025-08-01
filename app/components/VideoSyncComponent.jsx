@@ -20,6 +20,12 @@ export default function VideoSyncComponent({ boxId }) {
   const [error, setError] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
 
+  // ✅ NOUVEAUX ÉTATS pour changement de vidéo dynamique
+  const [customVideoUrl, setCustomVideoUrl] = useState("");
+  const [currentVideoUrl, setCurrentVideoUrl] = useState("");
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
+
   // Récupération de la box + film
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -41,7 +47,13 @@ export default function VideoSyncComponent({ boxId }) {
           }
         )
           .then((res) => res.json())
-          .then(setBoxInfo)
+          .then((box) => {
+            setBoxInfo(box);
+            // ✅ Vérifier si l'utilisateur est le créateur
+            setIsCreator(box.createdBy === user.id);
+            // ✅ Initialiser l'URL vidéo
+            setCurrentVideoUrl(box.movie?.videoUrl || "");
+          })
           .catch(() => setError("Erreur chargement de la box"));
       })
       .catch(() => setError("Erreur utilisateur"));
@@ -68,6 +80,11 @@ export default function VideoSyncComponent({ boxId }) {
           else if (videoMessage.action === "seek" && playerRef.current) {
             playerRef.current.seekTo(videoMessage.time || 0);
           }
+          // ✅ NOUVEAU: Écouter les changements d'URL vidéo
+          else if (videoMessage.action === "change-url") {
+            setCurrentVideoUrl(videoMessage.url);
+            setPlaying(false); // Arrêter la lecture lors du changement
+          }
 
           setTimeout(() => {
             suppressEvent.current = false;
@@ -93,10 +110,11 @@ export default function VideoSyncComponent({ boxId }) {
     return () => client.deactivate();
   }, [boxInfo]);
 
-  const sendVideoAction = (action, time = null) => {
+  const sendVideoAction = (action, time = null, url = null) => {
     if (!stompClient.current?.connected) return;
     const body = { action };
     if (time !== null) body.time = time;
+    if (url !== null) body.url = url;
 
     stompClient.current.publish({
       destination: `/app/box/${boxId}/video-sync`,
@@ -105,6 +123,71 @@ export default function VideoSyncComponent({ boxId }) {
 
     if (action === "play") setPlaying(true);
     if (action === "pause") setPlaying(false);
+  };
+
+  // ✅ NOUVELLE FONCTION: Changer la vidéo dynamiquement
+  const handleChangeVideo = () => {
+    if (!customVideoUrl.trim()) {
+      alert("Veuillez entrer une URL valide");
+      return;
+    }
+
+    // Valider l'URL (basique)
+    try {
+      new URL(customVideoUrl);
+    } catch {
+      alert("URL invalide. Veuillez vérifier le lien.");
+      return;
+    }
+
+    // Mettre à jour localement
+    setCurrentVideoUrl(customVideoUrl);
+    setPlaying(false);
+
+    // Envoyer aux autres utilisateurs
+    sendVideoAction("change-url", null, customVideoUrl);
+
+    // Ajouter un message dans le chat
+    if (currentUser && stompClient.current?.connected) {
+      stompClient.current.publish({
+        destination: `/app/box/${boxId}/chat`,
+        body: JSON.stringify({
+          sender: "Système",
+          senderId: "system",
+          content: `🎬 ${currentUser.username} a changé la vidéo`,
+        }),
+      });
+    }
+
+    // Reset et fermer l'input
+    setCustomVideoUrl("");
+    setShowUrlInput(false);
+
+    alert("Vidéo changée avec succès ! 🎬");
+  };
+
+  // ✅ NOUVELLE FONCTION: Revenir à la vidéo de la base de données
+  const handleResetToOriginal = () => {
+    const originalUrl = boxInfo.movie?.videoUrl || "";
+    if (!originalUrl) {
+      alert("Aucune vidéo originale disponible");
+      return;
+    }
+
+    setCurrentVideoUrl(originalUrl);
+    setPlaying(false);
+    sendVideoAction("change-url", null, originalUrl);
+
+    if (currentUser && stompClient.current?.connected) {
+      stompClient.current.publish({
+        destination: `/app/box/${boxId}/chat`,
+        body: JSON.stringify({
+          sender: "Système",
+          senderId: "system",
+          content: `🔄 ${currentUser.username} a restauré la vidéo originale`,
+        }),
+      });
+    }
   };
 
   const handlePlay = () => {
@@ -216,20 +299,81 @@ export default function VideoSyncComponent({ boxId }) {
                     <span>Film disponible</span>
                   </div>
                 )}
+                {isCreator && (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <span className="text-yellow-400 font-medium">
+                      Créateur
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+
+          {/* ✅ CONTRÔLES VIDÉO POUR LE CRÉATEUR */}
+          {isCreator && (
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowUrlInput(!showUrlInput)}
+                className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 px-4 py-2 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-blue-500/25 hover:scale-105 active:scale-95 text-sm"
+              >
+                {showUrlInput ? "Annuler" : "Changer Vidéo"}
+              </button>
+
+              {boxInfo.movie?.videoUrl &&
+                currentVideoUrl !== boxInfo.movie.videoUrl && (
+                  <button
+                    onClick={handleResetToOriginal}
+                    className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 px-4 py-2 rounded-xl font-medium transition-all duration-300 shadow-lg hover:scale-105 active:scale-95 text-sm"
+                  >
+                    🔄 Original
+                  </button>
+                )}
+            </div>
+          )}
         </div>
+
+        {/* ✅ INPUT POUR CHANGER LA VIDÉO (visible uniquement pour le créateur) */}
+        {isCreator && showUrlInput && (
+          <div className="mt-4 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+            <div className="flex items-center space-x-2 mb-3">
+              <div className="w-6 h-6 bg-blue-500 rounded-lg flex items-center justify-center text-sm">
+                🎥
+              </div>
+              <h4 className="font-semibold text-blue-400">Changer la vidéo</h4>
+            </div>
+            <div className="flex space-x-3">
+              <input
+                type="url"
+                value={customVideoUrl}
+                onChange={(e) => setCustomVideoUrl(e.target.value)}
+                placeholder="Collez l'URL de la nouvelle vidéo ici..."
+                className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-400 text-white transition-all duration-300"
+                onKeyDown={(e) => e.key === "Enter" && handleChangeVideo()}
+              />
+              <button
+                onClick={handleChangeVideo}
+                disabled={!customVideoUrl.trim()}
+                className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-blue-500/25 hover:scale-105 active:scale-95"
+              >
+                Charger
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              ⚡ Formats supportés: MP4, M3U8, YouTube, Vimeo, etc.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Video Player */}
       <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10">
-        {boxInfo.movie?.videoUrl ? (
+        {currentVideoUrl ? (
           <div className="relative aspect-video">
             <ReactPlayer
               ref={playerRef}
-              url={boxInfo.movie.videoUrl}
-              //url="https://varcdn02x16x1-13.bom1bom.online:82/d/nbrvjui5bgeyf3tkumpzf4khpo75nclcqpang3l5ifh7vnuwjqjiacccnihovxjptsfe4hsj/Angel__x27_s.Last_Mission._Love.S01.E10.720p.WeCima.Show.mp4"
+              url={currentVideoUrl} // ✅ Utilise l'URL dynamique
               playing={playing}
               controls
               onPlay={handlePlay}
@@ -239,7 +383,7 @@ export default function VideoSyncComponent({ boxId }) {
               height="100%"
               config={{
                 file: {
-                  forceHLS: boxInfo.movie?.videoUrl?.includes(".m3u8"),
+                  forceHLS: currentVideoUrl?.includes(".m3u8"),
                 },
               }}
             />
@@ -279,7 +423,9 @@ export default function VideoSyncComponent({ boxId }) {
                 Aucun film disponible
               </h4>
               <p className="text-gray-400">
-                Ajoutez un film pour commencer la séance
+                {isCreator
+                  ? "Cliquez sur 'Changer Vidéo' pour ajouter un film"
+                  : "En attente du film..."}
               </p>
             </div>
           </div>
@@ -292,7 +438,7 @@ export default function VideoSyncComponent({ boxId }) {
           boxId={boxId}
           currentUser={currentUser}
           stompClient={stompClient}
-          isWebSocketConnected={connected} // ⚠️ NOUVEAU: Passer l'état de connexion
+          isWebSocketConnected={connected}
         />
       )}
 
@@ -300,7 +446,8 @@ export default function VideoSyncComponent({ boxId }) {
       <div className="bg-gray-800/50 p-3 rounded-xl text-xs text-gray-400">
         <strong>Debug:</strong> WebSocket: {connected ? "✅" : "❌"} | User:{" "}
         {currentUser ? "✅" : "❌"} | Client:{" "}
-        {stompClient.current ? "✅" : "❌"}
+        {stompClient.current ? "✅" : "❌"} | Créateur:{" "}
+        {isCreator ? "✅" : "❌"} | URL: {currentVideoUrl ? "✅" : "❌"}
       </div>
 
       {/* Chat and Invitations Section */}
@@ -344,11 +491,15 @@ export default function VideoSyncComponent({ boxId }) {
               messages.map((msg, i) => {
                 const isCurrentUser =
                   currentUser && msg.senderId === currentUser.id;
+                const isSystemMessage = msg.senderId === "system";
+
                 return (
                   <div
                     key={i}
                     className={`p-3 rounded-xl border ${
-                      isCurrentUser
+                      isSystemMessage
+                        ? "bg-yellow-500/10 border-yellow-500/30"
+                        : isCurrentUser
                         ? "bg-blue-500/20 border-blue-500/30 ml-8"
                         : "bg-white/5 border-white/10 mr-8"
                     }`}
@@ -356,26 +507,40 @@ export default function VideoSyncComponent({ boxId }) {
                     <div className="flex items-center space-x-2 mb-1">
                       <div
                         className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white ${
-                          isCurrentUser
+                          isSystemMessage
+                            ? "bg-gradient-to-br from-yellow-500 to-orange-500"
+                            : isCurrentUser
                             ? "bg-gradient-to-br from-blue-500 to-cyan-500"
                             : "bg-gradient-to-br from-purple-500 to-pink-500"
                         }`}
                       >
-                        {msg.sender?.charAt(0)?.toUpperCase() || "?"}
+                        {isSystemMessage
+                          ? "⚙️"
+                          : msg.sender?.charAt(0)?.toUpperCase() || "?"}
                       </div>
                       <span
                         className={`font-semibold text-sm ${
-                          isCurrentUser ? "text-blue-300" : "text-purple-300"
+                          isSystemMessage
+                            ? "text-yellow-300"
+                            : isCurrentUser
+                            ? "text-blue-300"
+                            : "text-purple-300"
                         }`}
                       >
-                        {isCurrentUser ? "Vous" : msg.sender}
+                        {isSystemMessage
+                          ? "Système"
+                          : isCurrentUser
+                          ? "Vous"
+                          : msg.sender}
                       </span>
                       <span className="text-xs text-gray-500">•</span>
                       <span className="text-xs text-gray-500">maintenant</span>
                     </div>
                     <p
                       className={`text-sm ${
-                        isCurrentUser
+                        isSystemMessage
+                          ? "ml-8 text-yellow-100 font-medium"
+                          : isCurrentUser
                           ? "ml-8 text-blue-100"
                           : "ml-8 text-gray-200"
                       }`}
