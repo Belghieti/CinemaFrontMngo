@@ -49,8 +49,20 @@ export default function VideoSyncComponent({ boxId }) {
           .then((res) => res.json())
           .then((box) => {
             setBoxInfo(box);
+
+            // 🚨 DEBUG TEMPORAIRE - À SUPPRIMER APRÈS TEST
+            console.log("=== DEBUG CRÉATEUR ===");
+            console.log("Box createdBy:", box.createdBy, typeof box.createdBy);
+            console.log("User ID:", user.id, typeof user.id);
+            console.log("Égalité stricte (===):", box.createdBy === user.id);
+            console.log("Égalité souple (==):", box.createdBy == user.id);
+            console.log("Box complète:", box);
+            console.log("User complet:", user);
+            console.log("======================");
+
             // ✅ Vérifier si l'utilisateur est le créateur
-            setIsCreator(box.createdBy === user.id);
+            // setIsCreator(box.createdBy === user.id); // Original
+            setIsCreator(true); // 🚨 TEMPORAIRE POUR TEST - Remettre l'original après
             // ✅ Initialiser l'URL vidéo
             setCurrentVideoUrl(box.movie?.videoUrl || "");
           })
