@@ -304,7 +304,8 @@ export default function VideoSyncComponent({ boxId }) {
           <div className="relative aspect-video">
             <ReactPlayer
               ref={playerRef}
-              url={videoUrl}
+              //url={videoUrl}
+              url="https://www.youtube.com/watch?v=t6bTeGf658A"
               playing={playing}
               controls
               onPlay={handlePlay}
