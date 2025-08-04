@@ -46,16 +46,17 @@ export default function VideoSyncComponent({ boxId }) {
         )
           .then((res) => res.json())
           .then((data) => {
-            console.log("📦 BoxInfo reçue:", data); // ✅ Debug
+            console.log("📦 BoxInfo reçue:", data);
             setBoxInfo(data);
 
-            // ✅ Vérifier plusieurs formats possibles
+            // ✅ Vérifier plusieurs formats possibles pour l'URL vidéo
             const possibleVideoUrl =
               data.movie?.videoUrl ||
               data.movie?.url ||
               data.videoUrl ||
               data.movie?.streamUrl ||
-              data.movie?.src;
+              data.movie?.src ||
+              data.currentVideoUrl; // ✅ Nouveau champ pour URL actuelle
 
             if (possibleVideoUrl) {
               setVideoUrl(possibleVideoUrl);
@@ -80,24 +81,43 @@ export default function VideoSyncComponent({ boxId }) {
         console.log("✅ WebSocket connecté dans VideoSyncComponent");
         setConnected(true);
 
-        // Abonnements existants
+        // ✅ Abonnement aux actions vidéo (play/pause/seek/changeUrl)
         client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
           const videoMessage = JSON.parse(msg.body);
-          suppressEvent.current = true;
+          console.log("📺 Message vidéo reçu:", videoMessage);
 
-          if (videoMessage.action === "play") setPlaying(true);
-          else if (videoMessage.action === "pause") setPlaying(false);
-          else if (videoMessage.action === "seek" && playerRef.current) {
-            playerRef.current.seekTo(videoMessage.time || 0);
-          } else if (videoMessage.action === "changeUrl") {
-            console.log("📺 Changement d'URL vidéo reçu :", videoMessage.url);
-            setVideoUrl(videoMessage.url);
-            setPlaying(false);
+          // ✅ IMPORTANT: Ne pas supprimer l'événement pour changeUrl
+          if (videoMessage.action !== "changeUrl") {
+            suppressEvent.current = true;
           }
 
-          setTimeout(() => {
-            suppressEvent.current = false;
-          }, 500);
+          if (videoMessage.action === "play") {
+            setPlaying(true);
+          } else if (videoMessage.action === "pause") {
+            setPlaying(false);
+          } else if (videoMessage.action === "seek" && playerRef.current) {
+            playerRef.current.seekTo(videoMessage.time || 0);
+          } else if (videoMessage.action === "changeUrl") {
+            // ✅ Changement d'URL - PAS de suppressEvent ici !
+            console.log("🔄 Changement d'URL reçu:", videoMessage.url);
+            setVideoUrl(videoMessage.url);
+            setPlaying(false); // Pause automatique
+
+            // ✅ Optionnel: Sauvegarder aussi localement dans boxInfo
+            if (boxInfo) {
+              setBoxInfo((prev) => ({
+                ...prev,
+                currentVideoUrl: videoMessage.url,
+              }));
+            }
+          }
+
+          // ✅ Réactiver les événements après 500ms (sauf pour changeUrl)
+          if (videoMessage.action !== "changeUrl") {
+            setTimeout(() => {
+              suppressEvent.current = false;
+            }, 500);
+          }
         });
 
         client.subscribe(`/topic/box/${boxId}/chat`, (msg) => {
@@ -133,10 +153,14 @@ export default function VideoSyncComponent({ boxId }) {
     if (action === "pause") setPlaying(false);
   };
 
-  // 🟩 1. ✅ Nouvelle fonction pour envoyer changement d'URL via WebSocket
+  // ✅ Fonction pour envoyer changement d'URL via WebSocket
   const sendChangeUrl = (newUrl) => {
-    if (!stompClient.current?.connected) return;
+    if (!stompClient.current?.connected) {
+      console.error("❌ WebSocket non connecté");
+      return;
+    }
 
+    console.log("📤 Envoi changement URL:", newUrl);
     stompClient.current.publish({
       destination: `/app/box/${boxId}/video-sync`,
       body: JSON.stringify({ action: "changeUrl", url: newUrl }),
@@ -174,31 +198,45 @@ export default function VideoSyncComponent({ boxId }) {
     setNewMessage("");
   };
 
-  // 🟩 2. ✅ Fonction modifiée pour changer l'URL vidéo avec sync + sauvegarde
+  // ✅ Fonction CORRIGÉE pour changer l'URL vidéo
   const handleVideoUrlChange = async () => {
-    if (videoUrl.trim()) {
-      setShowUrlInput(false);
-      console.log("🎬 Nouvelle URL vidéo:", videoUrl);
+    if (!videoUrl.trim()) {
+      console.error("❌ URL vide");
+      return;
+    }
 
-      // 🔁 Broadcast aux autres participants
-      sendChangeUrl(videoUrl);
+    setShowUrlInput(false);
+    console.log("🎬 Changement d'URL vers:", videoUrl);
 
-      // 🔒 Enregistrer en base de données
-      try {
-        const token = localStorage.getItem("token");
-        await fetch(
-          `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}/video-url?value=${encodeURIComponent(
-            videoUrl
-          )}`,
-          {
-            method: "PATCH",
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        console.log("✅ URL sauvegardée dans la base");
-      } catch (err) {
-        console.error("❌ Erreur sauvegarde backend", err);
+    // ✅ 1. D'abord synchroniser avec les autres participants
+    sendChangeUrl(videoUrl);
+
+    // ✅ 2. Essayer de sauvegarder en base (optionnel - peut échouer)
+    try {
+      const token = localStorage.getItem("token");
+
+      // ✅ Essayer différentes approches pour la sauvegarde
+      const saveResponse = await fetch(
+        `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            currentVideoUrl: videoUrl, // ✅ Nouveau champ pour URL actuelle
+          }),
+        }
+      );
+
+      if (saveResponse.ok) {
+        console.log("✅ URL sauvegardée en base de données");
+      } else {
+        console.warn("⚠️ Sauvegarde échouée, mais synchronisation OK");
       }
+    } catch (err) {
+      console.warn("⚠️ Erreur sauvegarde (mais sync fonctionne):", err.message);
     }
   };
 
@@ -306,9 +344,10 @@ export default function VideoSyncComponent({ boxId }) {
           {/* ✅ Bouton pour changer la vidéo */}
           <button
             onClick={() => setShowUrlInput(!showUrlInput)}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 px-4 py-2 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-purple-500/25 hover:scale-105 active:scale-95"
+            disabled={!connected}
+            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed px-4 py-2 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-purple-500/25 hover:scale-105 active:scale-95"
           >
-            Changer Vidéo
+            {connected ? "Changer Vidéo" : "Connexion..."}
           </button>
         </div>
 
@@ -324,9 +363,10 @@ export default function VideoSyncComponent({ boxId }) {
             />
             <button
               onClick={handleVideoUrlChange}
-              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-green-500/25"
+              disabled={!connected || !videoUrl.trim()}
+              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-green-500/25"
             >
-              Charger
+              Synchroniser
             </button>
           </div>
         )}
@@ -338,7 +378,7 @@ export default function VideoSyncComponent({ boxId }) {
           <div className="relative aspect-video">
             <ReactPlayer
               ref={playerRef}
-              url={videoUrl} // 🟩 4. ✅ Utilise maintenant la variable videoUrl au lieu d'une URL fixe
+              url={videoUrl} // ✅ Utilise la variable dynamique
               playing={playing}
               controls
               onPlay={handlePlay}
@@ -391,7 +431,9 @@ export default function VideoSyncComponent({ boxId }) {
                 Aucun film disponible
               </h4>
               <p className="text-gray-400 mb-4">
-                Cliquez sur 'Changer Vidéo' pour ajouter un film
+                {connected
+                  ? "Cliquez sur 'Changer Vidéo' pour ajouter un film"
+                  : "Connexion en cours..."}
               </p>
 
               {/* ✅ URLs d'exemple */}
@@ -410,12 +452,12 @@ export default function VideoSyncComponent({ boxId }) {
         )}
       </div>
 
-      {/* ✅ Debug Info - Affiche les données reçues */}
+      {/* ✅ Debug Info amélioré */}
       <div className="bg-gray-800/50 p-3 rounded-xl text-xs text-gray-400">
         <strong>Debug:</strong>
         WebSocket: {connected ? "✅" : "❌"} | User: {currentUser ? "✅" : "❌"}{" "}
-        | VideoURL: {videoUrl ? "✅" : "❌"} | BoxInfo:{" "}
-        {JSON.stringify(boxInfo?.movie || "Pas de movie")}
+        | VideoURL: {videoUrl ? `✅ ${videoUrl.substring(0, 50)}...` : "❌"} |
+        Playing: {playing ? "▶️" : "⏸️"}
       </div>
 
       {/* ✅ APPEL VIDÉO : Ne s'affiche que quand tout est prêt */}
