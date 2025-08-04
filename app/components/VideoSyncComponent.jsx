@@ -89,6 +89,10 @@ export default function VideoSyncComponent({ boxId }) {
           else if (videoMessage.action === "pause") setPlaying(false);
           else if (videoMessage.action === "seek" && playerRef.current) {
             playerRef.current.seekTo(videoMessage.time || 0);
+          } else if (videoMessage.action === "changeUrl") {
+            console.log("📺 Changement d'URL vidéo reçu :", videoMessage.url);
+            setVideoUrl(videoMessage.url);
+            setPlaying(false);
           }
 
           setTimeout(() => {
@@ -129,6 +133,16 @@ export default function VideoSyncComponent({ boxId }) {
     if (action === "pause") setPlaying(false);
   };
 
+  // 🟩 1. ✅ Nouvelle fonction pour envoyer changement d'URL via WebSocket
+  const sendChangeUrl = (newUrl) => {
+    if (!stompClient.current?.connected) return;
+
+    stompClient.current.publish({
+      destination: `/app/box/${boxId}/video-sync`,
+      body: JSON.stringify({ action: "changeUrl", url: newUrl }),
+    });
+  };
+
   const handlePlay = () => {
     if (!suppressEvent.current) sendVideoAction("play");
   };
@@ -160,11 +174,31 @@ export default function VideoSyncComponent({ boxId }) {
     setNewMessage("");
   };
 
-  // ✅ Fonction pour changer l'URL vidéo
-  const handleVideoUrlChange = () => {
+  // 🟩 2. ✅ Fonction modifiée pour changer l'URL vidéo avec sync + sauvegarde
+  const handleVideoUrlChange = async () => {
     if (videoUrl.trim()) {
       setShowUrlInput(false);
       console.log("🎬 Nouvelle URL vidéo:", videoUrl);
+
+      // 🔁 Broadcast aux autres participants
+      sendChangeUrl(videoUrl);
+
+      // 🔒 Enregistrer en base de données
+      try {
+        const token = localStorage.getItem("token");
+        await fetch(
+          `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}/video-url?value=${encodeURIComponent(
+            videoUrl
+          )}`,
+          {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        console.log("✅ URL sauvegardée dans la base");
+      } catch (err) {
+        console.error("❌ Erreur sauvegarde backend", err);
+      }
     }
   };
 
@@ -304,8 +338,7 @@ export default function VideoSyncComponent({ boxId }) {
           <div className="relative aspect-video">
             <ReactPlayer
               ref={playerRef}
-              //url={videoUrl}
-              url="https://www.youtube.com/watch?v=t6bTeGf658A"
+              url={videoUrl} // 🟩 4. ✅ Utilise maintenant la variable videoUrl au lieu d'une URL fixe
               playing={playing}
               controls
               onPlay={handlePlay}
