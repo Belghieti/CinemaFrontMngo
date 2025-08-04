@@ -10,6 +10,7 @@ export default function VideoSyncComponent({ boxId }) {
   const invitContainerRef = useRef(null);
   const suppressEvent = useRef(false);
   const seekTimeout = useRef(null);
+  const reconnectTimeout = useRef(null); // ✅ Pour gérer les reconnexions
 
   const [connected, setConnected] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -19,6 +20,8 @@ export default function VideoSyncComponent({ boxId }) {
   const [boxInfo, setBoxInfo] = useState(null);
   const [error, setError] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [connectionAttempts, setConnectionAttempts] = useState(0); // ✅ Compteur de tentatives
+  const [isReconnecting, setIsReconnecting] = useState(false); // ✅ État de reconnexion
 
   // ✅ État pour gérer l'URL vidéo manuellement
   const [videoUrl, setVideoUrl] = useState("");
@@ -56,7 +59,7 @@ export default function VideoSyncComponent({ boxId }) {
               data.videoUrl ||
               data.movie?.streamUrl ||
               data.movie?.src ||
-              data.currentVideoUrl; // ✅ Nouveau champ pour URL actuelle
+              data.currentVideoUrl;
 
             if (possibleVideoUrl) {
               setVideoUrl(possibleVideoUrl);
@@ -70,101 +73,188 @@ export default function VideoSyncComponent({ boxId }) {
       .catch(() => setError("Erreur utilisateur"));
   }, [boxId]);
 
-  // Connexion WebSocket
+  // ✅ Fonction pour nettoyer la connexion WebSocket
+  const cleanupWebSocket = () => {
+    if (stompClient.current) {
+      try {
+        if (stompClient.current.connected) {
+          stompClient.current.deactivate();
+        }
+        stompClient.current = null;
+      } catch (err) {
+        console.warn("⚠️ Erreur lors du nettoyage WebSocket:", err);
+      }
+    }
+    if (reconnectTimeout.current) {
+      clearTimeout(reconnectTimeout.current);
+      reconnectTimeout.current = null;
+    }
+  };
+
+  // ✅ Connexion WebSocket améliorée avec gestion des erreurs
   useEffect(() => {
-    if (!boxInfo) return;
+    if (!boxInfo || !currentUser) return;
+
+    // ✅ Nettoyer l'ancienne connexion
+    cleanupWebSocket();
+
+    console.log(
+      `🔌 Tentative de connexion WebSocket (${connectionAttempts + 1})`
+    );
+    setIsReconnecting(connectionAttempts > 0);
 
     const client = new Client({
       brokerURL: `wss://cinemamongo-production.up.railway.app/ws`,
-      reconnectDelay: 5000,
+      reconnectDelay: 3000, // ✅ Délai plus court
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+      maxReconnectAttempts: 10, // ✅ Limite les tentatives
+
       onConnect: () => {
         console.log("✅ WebSocket connecté dans VideoSyncComponent");
         setConnected(true);
+        setConnectionAttempts(0);
+        setIsReconnecting(false);
+        setError(null);
 
-        // ✅ Abonnement aux actions vidéo (play/pause/seek/changeUrl)
-        client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
-          const videoMessage = JSON.parse(msg.body);
-          console.log("📺 Message vidéo reçu:", videoMessage);
+        // ✅ Abonnement aux actions vidéo avec gestion d'erreur
+        try {
+          client.subscribe(`/topic/box/${boxId}/video-sync`, (msg) => {
+            try {
+              const videoMessage = JSON.parse(msg.body);
+              console.log("📺 Message vidéo reçu:", videoMessage);
 
-          // ✅ IMPORTANT: Ne pas supprimer l'événement pour changeUrl
-          if (videoMessage.action !== "changeUrl") {
-            suppressEvent.current = true;
-          }
+              // ✅ Ne pas supprimer l'événement pour changeUrl
+              if (videoMessage.action !== "changeUrl") {
+                suppressEvent.current = true;
+              }
 
-          if (videoMessage.action === "play") {
-            setPlaying(true);
-          } else if (videoMessage.action === "pause") {
-            setPlaying(false);
-          } else if (videoMessage.action === "seek" && playerRef.current) {
-            playerRef.current.seekTo(videoMessage.time || 0);
-          } else if (videoMessage.action === "changeUrl") {
-            // ✅ Changement d'URL - PAS de suppressEvent ici !
-            console.log("🔄 Changement d'URL reçu:", videoMessage.url);
-            setVideoUrl(videoMessage.url);
-            setPlaying(false); // Pause automatique
+              if (videoMessage.action === "play") {
+                setPlaying(true);
+              } else if (videoMessage.action === "pause") {
+                setPlaying(false);
+              } else if (videoMessage.action === "seek" && playerRef.current) {
+                playerRef.current.seekTo(videoMessage.time || 0);
+              } else if (videoMessage.action === "changeUrl") {
+                console.log("🔄 Changement d'URL reçu:", videoMessage.url);
+                setVideoUrl(videoMessage.url);
+                setPlaying(false);
+              }
 
-            // ✅ Optionnel: Sauvegarder aussi localement dans boxInfo
-            if (boxInfo) {
-              setBoxInfo((prev) => ({
-                ...prev,
-                currentVideoUrl: videoMessage.url,
-              }));
+              // ✅ Réactiver les événements après 500ms (sauf pour changeUrl)
+              if (videoMessage.action !== "changeUrl") {
+                setTimeout(() => {
+                  suppressEvent.current = false;
+                }, 500);
+              }
+            } catch (err) {
+              console.error("❌ Erreur parsing message vidéo:", err);
             }
-          }
+          });
 
-          // ✅ Réactiver les événements après 500ms (sauf pour changeUrl)
-          if (videoMessage.action !== "changeUrl") {
-            setTimeout(() => {
-              suppressEvent.current = false;
-            }, 500);
-          }
-        });
+          client.subscribe(`/topic/box/${boxId}/chat`, (msg) => {
+            try {
+              setMessages((prev) => [...prev, JSON.parse(msg.body)]);
+            } catch (err) {
+              console.error("❌ Erreur parsing message chat:", err);
+            }
+          });
 
-        client.subscribe(`/topic/box/${boxId}/chat`, (msg) => {
-          setMessages((prev) => [...prev, JSON.parse(msg.body)]);
-        });
-
-        client.subscribe(`/topic/box/${boxId}/invitations`, (msg) => {
-          setInvitations((prev) => [...prev, JSON.parse(msg.body)]);
-        });
+          client.subscribe(`/topic/box/${boxId}/invitations`, (msg) => {
+            try {
+              setInvitations((prev) => [...prev, JSON.parse(msg.body)]);
+            } catch (err) {
+              console.error("❌ Erreur parsing invitation:", err);
+            }
+          });
+        } catch (err) {
+          console.error("❌ Erreur lors des abonnements:", err);
+        }
       },
+
       onDisconnect: () => {
         console.log("❌ WebSocket déconnecté");
+        setConnected(false);
+        setIsReconnecting(true);
+      },
+
+      onStompError: (frame) => {
+        console.error("❌ Erreur STOMP:", frame.headers["message"]);
+        setError("Erreur de connexion au serveur");
+        setConnected(false);
+
+        // ✅ Tentative de reconnexion après erreur
+        setConnectionAttempts((prev) => prev + 1);
+        if (connectionAttempts < 5) {
+          reconnectTimeout.current = setTimeout(() => {
+            console.log("🔄 Tentative de reconnexion...");
+            // Re-trigger useEffect
+            setBoxInfo((prev) => ({ ...prev }));
+          }, 5000);
+        }
+      },
+
+      onWebSocketError: (event) => {
+        console.error("❌ Erreur WebSocket:", event);
         setConnected(false);
       },
     });
 
-    client.activate();
-    stompClient.current = client;
-    return () => client.deactivate();
-  }, [boxInfo]);
+    try {
+      client.activate();
+      stompClient.current = client;
+    } catch (err) {
+      console.error("❌ Erreur activation WebSocket:", err);
+      setError("Impossible de se connecter au serveur");
+    }
+
+    // ✅ Cleanup
+    return () => {
+      cleanupWebSocket();
+    };
+  }, [boxInfo, currentUser, connectionAttempts]); // ✅ Ajout connectionAttempts pour les reconnexions
 
   const sendVideoAction = (action, time = null) => {
-    if (!stompClient.current?.connected) return;
-    const body = { action };
-    if (time !== null) body.time = time;
+    if (!stompClient.current?.connected) {
+      console.warn("⚠️ WebSocket non connecté, action ignorée:", action);
+      return;
+    }
 
-    stompClient.current.publish({
-      destination: `/app/box/${boxId}/video-sync`,
-      body: JSON.stringify(body),
-    });
+    try {
+      const body = { action };
+      if (time !== null) body.time = time;
 
-    if (action === "play") setPlaying(true);
-    if (action === "pause") setPlaying(false);
+      stompClient.current.publish({
+        destination: `/app/box/${boxId}/video-sync`,
+        body: JSON.stringify(body),
+      });
+
+      if (action === "play") setPlaying(true);
+      if (action === "pause") setPlaying(false);
+    } catch (err) {
+      console.error("❌ Erreur envoi action vidéo:", err);
+    }
   };
 
   // ✅ Fonction pour envoyer changement d'URL via WebSocket
   const sendChangeUrl = (newUrl) => {
     if (!stompClient.current?.connected) {
-      console.error("❌ WebSocket non connecté");
-      return;
+      console.error("❌ WebSocket non connecté pour changement URL");
+      setError("Connexion perdue. Veuillez actualiser la page.");
+      return false;
     }
 
-    console.log("📤 Envoi changement URL:", newUrl);
-    stompClient.current.publish({
-      destination: `/app/box/${boxId}/video-sync`,
-      body: JSON.stringify({ action: "changeUrl", url: newUrl }),
-    });
+    try {
+      console.log("📤 Envoi changement URL:", newUrl);
+      stompClient.current.publish({
+        destination: `/app/box/${boxId}/video-sync`,
+        body: JSON.stringify({ action: "changeUrl", url: newUrl }),
+      });
+      return true;
+    } catch (err) {
+      console.error("❌ Erreur envoi changement URL:", err);
+      return false;
+    }
   };
 
   const handlePlay = () => {
@@ -186,19 +276,23 @@ export default function VideoSyncComponent({ boxId }) {
     if (!newMessage.trim() || !stompClient.current?.connected || !currentUser)
       return;
 
-    stompClient.current.publish({
-      destination: `/app/box/${boxId}/chat`,
-      body: JSON.stringify({
-        sender: currentUser.username,
-        senderId: currentUser.id,
-        content: newMessage,
-      }),
-    });
+    try {
+      stompClient.current.publish({
+        destination: `/app/box/${boxId}/chat`,
+        body: JSON.stringify({
+          sender: currentUser.username,
+          senderId: currentUser.id,
+          content: newMessage,
+        }),
+      });
 
-    setNewMessage("");
+      setNewMessage("");
+    } catch (err) {
+      console.error("❌ Erreur envoi message:", err);
+    }
   };
 
-  // ✅ Fonction CORRIGÉE pour changer l'URL vidéo
+  // ✅ Fonction CORRIGÉE pour changer l'URL vidéo (sans sauvegarde backend problématique)
   const handleVideoUrlChange = async () => {
     if (!videoUrl.trim()) {
       console.error("❌ URL vide");
@@ -208,36 +302,48 @@ export default function VideoSyncComponent({ boxId }) {
     setShowUrlInput(false);
     console.log("🎬 Changement d'URL vers:", videoUrl);
 
-    // ✅ 1. D'abord synchroniser avec les autres participants
-    sendChangeUrl(videoUrl);
-
-    // ✅ 2. Essayer de sauvegarder en base (optionnel - peut échouer)
-    try {
-      const token = localStorage.getItem("token");
-
-      // ✅ Essayer différentes approches pour la sauvegarde
-      const saveResponse = await fetch(
-        `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            currentVideoUrl: videoUrl, // ✅ Nouveau champ pour URL actuelle
-          }),
-        }
+    // ✅ Synchroniser avec les autres participants (priorité absolue)
+    const success = sendChangeUrl(videoUrl);
+    if (!success) {
+      setError(
+        "Impossible de synchroniser la vidéo. Vérifiez votre connexion."
       );
-
-      if (saveResponse.ok) {
-        console.log("✅ URL sauvegardée en base de données");
-      } else {
-        console.warn("⚠️ Sauvegarde échouée, mais synchronisation OK");
-      }
-    } catch (err) {
-      console.warn("⚠️ Erreur sauvegarde (mais sync fonctionne):", err.message);
+      return;
     }
+
+    // ✅ Mise à jour locale immédiate (même sans backend)
+    setVideoUrl(videoUrl);
+    setPlaying(false);
+
+    // ✅ OPTIONNEL : Tentative de sauvegarde (mais on s'en fiche si ça échoue)
+    setTimeout(async () => {
+      try {
+        const token = localStorage.getItem("token");
+
+        // ✅ Essayer SEULEMENT un simple PATCH sur l'endpoint qui existe
+        const response = await fetch(
+          `https://cinemamongo-production.up.railway.app/api/boxes/${boxId}`,
+          {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              videoUrl: videoUrl, // ✅ Champ simple
+            }),
+          }
+        );
+
+        if (response.ok) {
+          console.log("✅ URL sauvegardée en base (bonus)");
+        } else {
+          console.log("⚠️ Sauvegarde échouée mais sync OK");
+        }
+      } catch (err) {
+        console.log("⚠️ Pas de sauvegarde backend (sync temps réel suffit)");
+      }
+    }, 1000); // ✅ Délai pour éviter de surcharger
   };
 
   // ✅ Fonction pour détecter le format vidéo
@@ -278,9 +384,17 @@ export default function VideoSyncComponent({ boxId }) {
           </svg>
         </div>
         <p className="text-red-400 font-medium">{error}</p>
-        <p className="text-gray-400 text-sm mt-2">
-          Veuillez actualiser la page
-        </p>
+        <div className="mt-4 space-y-2">
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 px-6 py-2 rounded-xl font-medium transition-all duration-300"
+          >
+            Actualiser la page
+          </button>
+          <p className="text-gray-400 text-sm">
+            {connectionAttempts > 0 && `Tentatives: ${connectionAttempts}/5`}
+          </p>
+        </div>
       </div>
     );
   }
@@ -314,10 +428,20 @@ export default function VideoSyncComponent({ boxId }) {
                 <div className="flex items-center space-x-2">
                   <div
                     className={`w-3 h-3 rounded-full ${
-                      connected ? "bg-green-500" : "bg-red-500"
+                      connected
+                        ? "bg-green-500"
+                        : isReconnecting
+                        ? "bg-yellow-500"
+                        : "bg-red-500"
                     } animate-pulse`}
                   ></div>
-                  <span>{connected ? "Connecté" : "Déconnecté"}</span>
+                  <span>
+                    {connected
+                      ? "Connecté"
+                      : isReconnecting
+                      ? "Reconnexion..."
+                      : "Déconnecté"}
+                  </span>
                 </div>
                 {videoUrl && (
                   <div className="flex items-center space-x-2">
@@ -347,7 +471,11 @@ export default function VideoSyncComponent({ boxId }) {
             disabled={!connected}
             className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed px-4 py-2 rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-purple-500/25 hover:scale-105 active:scale-95"
           >
-            {connected ? "Changer Vidéo" : "Connexion..."}
+            {connected
+              ? "Changer Vidéo"
+              : isReconnecting
+              ? "Reconnexion..."
+              : "Déconnecté"}
           </button>
         </div>
 
@@ -378,7 +506,7 @@ export default function VideoSyncComponent({ boxId }) {
           <div className="relative aspect-video">
             <ReactPlayer
               ref={playerRef}
-              url={videoUrl} // ✅ Utilise la variable dynamique
+              url={videoUrl}
               playing={playing}
               controls
               onPlay={handlePlay}
@@ -400,7 +528,9 @@ export default function VideoSyncComponent({ boxId }) {
                 <div className="text-center">
                   <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                   <p className="text-white font-medium">
-                    Connexion en cours...
+                    {isReconnecting
+                      ? "Reconnexion en cours..."
+                      : "Connexion en cours..."}
                   </p>
                   <p className="text-gray-400 text-sm">
                     Synchronisation avec les autres spectateurs
@@ -433,6 +563,8 @@ export default function VideoSyncComponent({ boxId }) {
               <p className="text-gray-400 mb-4">
                 {connected
                   ? "Cliquez sur 'Changer Vidéo' pour ajouter un film"
+                  : isReconnecting
+                  ? "Reconnexion en cours..."
                   : "Connexion en cours..."}
               </p>
 
@@ -455,9 +587,11 @@ export default function VideoSyncComponent({ boxId }) {
       {/* ✅ Debug Info amélioré */}
       <div className="bg-gray-800/50 p-3 rounded-xl text-xs text-gray-400">
         <strong>Debug:</strong>
-        WebSocket: {connected ? "✅" : "❌"} | User: {currentUser ? "✅" : "❌"}{" "}
-        | VideoURL: {videoUrl ? `✅ ${videoUrl.substring(0, 50)}...` : "❌"} |
-        Playing: {playing ? "▶️" : "⏸️"}
+        WebSocket: {connected ? "✅" : isReconnecting ? "🔄" : "❌"} | User:{" "}
+        {currentUser ? "✅" : "❌"} | VideoURL:{" "}
+        {videoUrl ? `✅ ${videoUrl.substring(0, 50)}...` : "❌"} | Playing:{" "}
+        {playing ? "▶️" : "⏸️"}
+        {connectionAttempts > 0 && ` | Tentatives: ${connectionAttempts}`}
       </div>
 
       {/* ✅ APPEL VIDÉO : Ne s'affiche que quand tout est prêt */}
